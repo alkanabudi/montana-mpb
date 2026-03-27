@@ -6,15 +6,14 @@ from oauth2client.service_account import ServiceAccountCredentials
 def get_gspread_client():
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
     
-    # --- LOGIKA SAKTI CLOUD VS LOKAL ---
-    # Jika aplikasi jalan di internet (Cloud), dia pakai Secrets
     if "gcp_service_account" in st.secrets:
-        creds_info = st.secrets["gcp_service_account"]
-        creds = ServiceAccountCredentials.from_json_keyfile_dict(dict(creds_info), scope)
-    
-    # Jika aplikasi jalan di laptop Mas Bram, dia cari file lokal
+        creds_info = dict(st.secrets["gcp_service_account"])
+        # JURUS PAMUNGKAS: Paksa perbaikan karakter \n yang sering bikin error base64
+        if "private_key" in creds_info:
+            creds_info["private_key"] = creds_info["private_key"].replace("\\n", "\n")
+            
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_info, scope)
     else:
-        # PENTING: Jangan pakai D:\Latihan, cukup nama filenya saja
         try:
             creds = ServiceAccountCredentials.from_json_keyfile_name("credentials.json.json", scope)
         except:
