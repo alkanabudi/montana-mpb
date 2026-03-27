@@ -6,7 +6,17 @@ from oauth2client.service_account import ServiceAccountCredentials
 # Helper untuk koneksi agar tidak nulis berulang-ulang
 def get_gspread_client():
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-    creds = ServiceAccountCredentials.from_json_keyfile_name(r"D:\Latihan\credentials.json.json", scope)
+    
+    # 1. Coba baca dari Streamlit Secrets (untuk Online/Cloud)
+    if "gcp_service_account" in st.secrets:
+        creds_info = st.secrets["gcp_service_account"]
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(dict(creds_info), scope)
+    
+    # 2. Jika tidak ada Secrets, baca dari file lokal (untuk di laptop Mas Bram)
+    else:
+        # Sesuaikan nama file JSON-nya dengan yang ada di folder laptop Mas Bram
+        creds = ServiceAccountCredentials.from_json_keyfile_name("credentials.json.json", scope)
+        
     return gspread.authorize(creds)
 
 @st.cache_data(ttl=600)
