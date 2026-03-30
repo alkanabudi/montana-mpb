@@ -26,45 +26,36 @@ def to_numeric_clean(series):
     s = series.astype(str).str.replace('Rp', '', regex=False).str.replace('.', '', regex=False).str.replace(',', '', regex=False).str.strip()
     return pd.to_numeric(s, errors='coerce').fillna(0)
 
-# --- 3. AMBIL DATA DARI GOOGLE SHEETS ---
+# --- 3. FUNGSI PEMBERSIH KOLOM DUPLIKAT ---
+def fix_duplicate_columns(headers):
+    clean_headers = []
+    for i, h in enumerate(headers):
+        new_h = h.strip() if h.strip() != "" else f"Kolom_{i}"
+        if new_h in clean_headers:
+            new_h = f"{new_h}_{i}"
+        clean_headers.append(new_h)
+    return clean_headers
+
+# --- 4. AMBIL DATA DARI GOOGLE SHEETS ---
 @st.cache_data(ttl=60)
-def get_data_mpb_2025():
+def get_data_from_google():
     client = get_gspread_client()
     if client is None: return pd.DataFrame()
     try:
-        sheet = client.open("Memo Perintah Bayar 2025").get_worksheet(0)
+        sheet = client.open("Daftar Penerimaan TAGIHAN MEMO PERINTAH BAYAR (Jawaban)").get_worksheet(0)
         list_of_lists = sheet.get_all_values()
-        
-        if not list_of_lists or len(list_of_lists) <= 1:
+        if len(list_of_lists) <= 1:
             return pd.DataFrame()
-            
-        # --- PROSES HEADER AGAR TIDAK DUPLIKAT ---
-        raw_headers = list_of_lists[0]
-        clean_headers = []
-        for i, h in enumerate(raw_headers):
-            new_h = h.strip()
-            # Jika kolom kosong, kasih nama 'Kolom_X'
-            if new_h == "":
-                new_h = f"Kolom_{i}"
-            # Jika nama sudah ada sebelumnya (duplikat), tambahkan angka urutan
-            if new_h in clean_headers:
-                new_h = f"{new_h}_{i}"
-            clean_headers.append(new_h)
-            
-        df = pd.DataFrame(list_of_lists[1:], columns=clean_headers)
         
-        # Bersihkan nominal jika kolomnya ada
-        target_col = "Nilai Tagihan" if "Nilai Tagihan" in df.columns else "NOMINAL TAGIHAN"
-        if target_col in df.columns:
-            df[target_col] = to_numeric_clean(df[target_col])
-            df["NOMINAL TAGIHAN"] = df[target_col] # Seragamkan nama untuk dashboard
-            
+        headers = fix_duplicate_columns(list_of_lists[0])
+        df = pd.DataFrame(list_of_lists[1:], columns=headers)
+        
+        if "NOMINAL TAGIHAN" in df.columns:
+            df["NOMINAL TAGIHAN"] = to_numeric_clean(df["NOMINAL TAGIHAN"])
         return df
-    except Exception as e:
-        # Kirim dataframe kosong saja jika error agar dashboard tidak mati total
+    except:
         return pd.DataFrame()
-    
-    
+
 @st.cache_data(ttl=60)
 def get_data_mpb_2025():
     client = get_gspread_client()
@@ -75,10 +66,18 @@ def get_data_mpb_2025():
         if not list_of_lists or len(list_of_lists) <= 1:
             return pd.DataFrame()
             
-        df = pd.DataFrame(list_of_lists[1:], columns=list_of_lists[0])
-        if "Nilai Tagihan" in df.columns:
-            df["Nilai Tagihan"] = to_numeric_clean(df["Nilai Tagihan"])
-            df["NOMINAL TAGIHAN"] = df["Nilai Tagihan"]
+        headers = fix_duplicate_columns(list_of_lists[0])
+        df = pd.DataFrame(list_of_lists[1:], columns=headers)
+        
+        # Cari kolom nilai tagihan secara fleksibel
+        target = ""
+        if "Nilai Tagihan" in df.columns: target = "Nilai Tagihan"
+        elif "NOMINAL TAGIHAN" in df.columns: target = "NOMINAL TAGIHAN"
+        
+        if target:
+            df[target] = to_numeric_clean(df[target])
+            df["NOMINAL TAGIHAN"] = df[target]
+            
         return df
     except:
         return pd.DataFrame()
@@ -93,15 +92,13 @@ def save_data_to_google(data_row):
     except:
         return False
 
-# --- 4. AI MONTANA (VERSI GENERATIVE AI) ---
+# --- 5. AI MONTANA ---
 def get_montana_chat_response(user_query):
     try:
         genai.configure(api_key=st.secrets["gemini_api_key"])
         model = genai.GenerativeModel('gemini-1.5-flash-latest')
-
         file_id = "1jX-yVKyMmIuOOdx7Z-qpEtTYzn_RhNu1" 
         url = f'https://drive.google.com/uc?id={file_id}&export=download'
-        
         resp = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=15)
         text_knowledge = ""
         if resp.status_code == 200:
