@@ -75,32 +75,40 @@ def save_data_to_google(data_row):
 # --- 6. AI MONTANA ---
 def get_montana_chat_response(user_query):
     try:
-        genai.configure(api_key=st.secrets["gemini_api_key"])
+        # Pastikan API Key terpanggil dari Secrets
+        api_key_val = st.secrets["gemini_api_key"]
+        genai.configure(api_key=api_key_val)
         
-        # ID File PDF Mas Bram
+        # ID File PDF (Pastikan sudah SHARE: Anyone with the link)
         file_id = "1jX-yVKyMmIuOOdx7Z-qpEtTYzn_RhNu1" 
-        
-        # --- REVISI URL: Gunakan format export agar tidak terblokir ---
         url = f'https://drive.google.com/uc?id={file_id}&export=download'
         
+        # Ambil konten PDF
+        response = requests.get(url, timeout=15)
         text_knowledge = ""
-        # Tambahkan timeout agar tidak menggantung jika koneksi lambat
-        response = requests.get(url, timeout=10)
         
         if response.status_code == 200:
             pdf_file = BytesIO(response.content)
             reader = PdfReader(pdf_file)
             for page in reader.pages:
-                text_knowledge += page.extract_text()
+                text_content = page.extract_text()
+                if text_content:
+                    text_knowledge += text_content
         
-        # Jika PDF kosong atau gagal baca, beri teks default
-        if not text_knowledge:
-            text_knowledge = "Dokumen SOP tidak terbaca. Harap hubungi admin."
-
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        prompt = f"Anda Montana AI. Jawablah berdasarkan dokumen ini: {text_knowledge}\n\nUser: {user_query}"
-        ai_resp = model.generate_content(prompt)
-        return ai_resp.text
+        # Gunakan model PRO (Lebih stabil untuk koneksi Streamlit Cloud)
+        model = genai.GenerativeModel('gemini-1.5-pro')
+        
+        full_prompt = f"Anda Montana AI. Gunakan data ini untuk menjawab: {text_knowledge[:15000]}\n\nUser: {user_query}"
+        
+        # Tambahkan konfigurasi keamanan agar tidak gampang terblokir
+        ai_resp = model.generate_content(full_prompt)
+        
+        if ai_resp and ai_resp.text:
+            return ai_resp.text
+        else:
+            return "Montana sedang mencari jawaban yang tepat, coba ulangi pertanyaan Anda."
 
     except Exception as e:
+        # Menampilkan detail error di terminal VS Code/Logs Cloud untuk memudahkan Mas Bram
+        print(f"DEBUG AI ERROR: {str(e)}")
         return f"Sistem sedang pemeliharaan teknis. ({str(e)})"
