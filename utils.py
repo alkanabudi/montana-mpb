@@ -103,7 +103,7 @@ def get_montana_chat_response(user_query):
         genai.configure(api_key=api_key)
 
         # 2. Inisialisasi Model (Gunakan Nama Standar)
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        model = genai.GenerativeModel('gemini-pro')
 
         # 3. Ambil PDF (Logika GDrive Mas Bram)
         file_id = "1jX-yVKyMmIuOOdx7Z-qpEtTYzn_RhNu1" 
