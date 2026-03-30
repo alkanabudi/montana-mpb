@@ -27,7 +27,7 @@ def to_numeric_clean(series):
     return pd.to_numeric(s, errors='coerce').fillna(0)
 
 # --- 3. AMBIL DATA DARI GOOGLE SHEETS ---
-@st.cache_data(ttl=600)
+@st.cache_data(ttl=60)
 def get_data_from_google():
     client = get_gspread_client()
     if client is None: return pd.DataFrame()
@@ -35,28 +35,33 @@ def get_data_from_google():
         sheet = client.open("Daftar Penerimaan TAGIHAN MEMO PERINTAH BAYAR (Jawaban)").get_worksheet(0)
         list_of_lists = sheet.get_all_values()
         
-        # Cek jika data kosong atau hanya judul kolom
-        if len(list_of_lists) <= 1: 
-            return pd.DataFrame() 
+        # JIKA DATA KOSONG (Hanya Header atau Tanpa Data)
+        if len(list_of_lists) <= 1:
+            # Kita buatkan 1 baris data Dummy agar Dashboard tidak Error
+            return pd.DataFrame({
+                "NOMINAL TAGIHAN": [0],
+                "NAMA UNIT": ["Belum Ada Data"],
+                "STATUS": ["Data Kosong"]
+            })
             
         df = pd.DataFrame(list_of_lists[1:], columns=list_of_lists[0])
         if "NOMINAL TAGIHAN" in df.columns:
             df["NOMINAL TAGIHAN"] = to_numeric_clean(df["NOMINAL TAGIHAN"])
         return df
     except:
-        return pd.DataFrame()
+        # Jika gagal koneksi, kirim data dummy juga
+        return pd.DataFrame({"NOMINAL TAGIHAN": [0], "NAMA UNIT": ["Error Koneksi"]})
 
-@st.cache_data(ttl=600)
+@st.cache_data(ttl=60)
 def get_data_mpb_2025():
     client = get_gspread_client()
     if client is None: return pd.DataFrame()
     try:
         sheet = client.open("Memo Perintah Bayar 2025").get_worksheet(0)
         list_of_lists = sheet.get_all_values()
-        
-        if len(list_of_lists) <= 1:
+        if not list_of_lists or len(list_of_lists) <= 1:
             return pd.DataFrame()
-
+            
         df = pd.DataFrame(list_of_lists[1:], columns=list_of_lists[0])
         if "Nilai Tagihan" in df.columns:
             df["Nilai Tagihan"] = to_numeric_clean(df["Nilai Tagihan"])
@@ -75,7 +80,7 @@ def save_data_to_google(data_row):
     except:
         return False
 
-# --- 4. AI MONTANA (VERSI NATIVE STABIL) ---
+# --- 4. AI MONTANA (VERSI GENERATIVE AI) ---
 def get_montana_chat_response(user_query):
     try:
         genai.configure(api_key=st.secrets["gemini_api_key"])
@@ -85,29 +90,15 @@ def get_montana_chat_response(user_query):
         url = f'https://drive.google.com/uc?id={file_id}&export=download'
         
         resp = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=15)
-        
         text_knowledge = ""
         if resp.status_code == 200:
             pdf_file = BytesIO(resp.content)
             reader = PdfReader(pdf_file)
             for page in reader.pages:
-                text_content = page.extract_text()
-                if text_content:
-                    text_knowledge += text_content
+                text_knowledge += page.extract_text() or ""
         
-        context = text_knowledge[:15000]
-
-        prompt = f"""Anda adalah Montana, asisten AI PT Petrokimia Gresik. 
-        Gunakan data SOP berikut untuk menjawab pertanyaan user secara akurat.
-        Jika informasi tidak ada di SOP, katakan bahwa Anda belum memiliki datanya.
-
-        DATA SOP:
-        {context}
-        
-        Pertanyaan User: {user_query}
-        Jawaban:"""
-        
+        prompt = f"Anda Montana AI. Jawablah berdasarkan data ini: {text_knowledge[:10000]}\n\nUser: {user_query}"
         ai_resp = model.generate_content(prompt)
         return ai_resp.text
     except Exception as e:
-        return f"Montana sedang istirahat sejenak. (Pesan: {str(e)})"
+        return f"Sistem sedang pemeliharaan teknis. (Pesan: {str(e)})"
