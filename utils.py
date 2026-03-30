@@ -96,7 +96,7 @@ def save_data_to_google(data_row):
 def get_montana_chat_response(user_query):
     try:
         # 1. Pastikan API Key Terpasang
-        api_key = st.secrets.get("gemini_api_key")
+        api_key = st.secrets.get("gemini_api_key") or "AIzaSyCIEE6rFaDA2ftqJ1tbxi3G-qsfWfmzQgE"
         if not api_key:
             return "Kunci API tidak ditemukan di Secrets."
             
