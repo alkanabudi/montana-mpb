@@ -35,23 +35,29 @@ def get_data_from_google():
         sheet = client.open("Daftar Penerimaan TAGIHAN MEMO PERINTAH BAYAR (Jawaban)").get_worksheet(0)
         list_of_lists = sheet.get_all_values()
         
-        # JIKA DATA KOSONG (Hanya Header atau Tanpa Data)
         if len(list_of_lists) <= 1:
-            # Kita buatkan 1 baris data Dummy agar Dashboard tidak Error
-            return pd.DataFrame({
-                "NOMINAL TAGIHAN": [0],
-                "NAMA UNIT": ["Belum Ada Data"],
-                "STATUS": ["Data Kosong"]
-            })
+            return pd.DataFrame({"NOMINAL TAGIHAN": [0], "NAMA UNIT": ["Belum Ada Data"]})
             
-        df = pd.DataFrame(list_of_lists[1:], columns=list_of_lists[0])
+        # Ambil Header
+        headers = list_of_lists[0]
+        
+        # --- JURUS PEMBERSIH DUPLIKAT ---
+        clean_headers = []
+        for i, h in enumerate(headers):
+            # Jika judul kosong, kasih nama 'Kolom_i'
+            new_h = h if h.strip() != "" else f"Kolom_{i}"
+            # Jika nama sudah ada sebelumnya, tambahkan angka di belakangnya
+            if new_h in clean_headers:
+                new_h = f"{new_h}_{i}"
+            clean_headers.append(new_h)
+            
+        df = pd.DataFrame(list_of_lists[1:], columns=clean_headers)
+        
         if "NOMINAL TAGIHAN" in df.columns:
             df["NOMINAL TAGIHAN"] = to_numeric_clean(df["NOMINAL TAGIHAN"])
         return df
-    except:
-        # Jika gagal koneksi, kirim data dummy juga
-        return pd.DataFrame({"NOMINAL TAGIHAN": [0], "NAMA UNIT": ["Error Koneksi"]})
-
+    except Exception as e:
+        return pd.DataFrame({"NOMINAL TAGIHAN": [0], "NAMA UNIT": [f"Error: {str(e)}"]})
 @st.cache_data(ttl=60)
 def get_data_mpb_2025():
     client = get_gspread_client()
