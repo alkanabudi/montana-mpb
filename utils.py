@@ -9,21 +9,18 @@ import tempfile
 from io import BytesIO
 from oauth2client.service_account import ServiceAccountCredentials
 
-# --- REVISI IMPORT LANGCHAIN ANTI-ERROR 2026 ---
-try:
-    # Cara baru untuk LangChain v0.3+
-    from langchain.chains.question_answering import load_qa_chain
-except ImportError:
-    try:
-        # Alternatif jika folder struktur berbeda
-        from langchain.chains import load_qa_chain
-    except ImportError:
-        # Jika benar-benar mentok
-        st.error("Library LangChain belum terpasang sempurna. Silakan Reboot App.")
-
+# --- REVISI IMPORT LANGCHAIN TERBARU (ANTI-ERROR 2026) ---
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_community.document_loaders import PyPDFLoader
-from langchain.prompts import PromptTemplate
+
+# Cara panggil PromptTemplate & QA Chain di versi terbaru
+try:
+    from langchain_core.prompts import PromptTemplate
+    from langchain.chains.question_answering import load_qa_chain
+except ImportError:
+    # Backup jika versi library di server berbeda
+    from langchain.prompts import PromptTemplate
+    from langchain.chains import load_qa_chain
 
 # --- 1. KONEKSI GOOGLE SHEETS ---
 def get_gspread_client():
