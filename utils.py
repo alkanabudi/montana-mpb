@@ -76,18 +76,31 @@ def save_data_to_google(data_row):
 def get_montana_chat_response(user_query):
     try:
         genai.configure(api_key=st.secrets["gemini_api_key"])
+        
+        # ID File PDF Mas Bram
         file_id = "1jX-yVKyMmIuOOdx7Z-qpEtTYzn_RhNu1" 
-        url = f'https://drive.google.com/uc?id={file_id}'
+        
+        # --- REVISI URL: Gunakan format export agar tidak terblokir ---
+        url = f'https://drive.google.com/uc?id={file_id}&export=download'
+        
         text_knowledge = ""
-        resp = requests.get(url)
-        if resp.status_code == 200:
-            reader = PdfReader(BytesIO(resp.content))
+        # Tambahkan timeout agar tidak menggantung jika koneksi lambat
+        response = requests.get(url, timeout=10)
+        
+        if response.status_code == 200:
+            pdf_file = BytesIO(response.content)
+            reader = PdfReader(pdf_file)
             for page in reader.pages:
                 text_knowledge += page.extract_text()
         
+        # Jika PDF kosong atau gagal baca, beri teks default
+        if not text_knowledge:
+            text_knowledge = "Dokumen SOP tidak terbaca. Harap hubungi admin."
+
         model = genai.GenerativeModel('gemini-1.5-flash')
-        prompt = f"Anda Montana AI. Jawablah pertanyaan user berdasarkan dokumen ini: {text_knowledge}\n\nUser: {user_query}"
+        prompt = f"Anda Montana AI. Jawablah berdasarkan dokumen ini: {text_knowledge}\n\nUser: {user_query}"
         ai_resp = model.generate_content(prompt)
         return ai_resp.text
+
     except Exception as e:
-        return f"AI sedang tidak tersedia ({str(e)})"
+        return f"Sistem sedang pemeliharaan teknis. ({str(e)})"
