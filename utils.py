@@ -96,7 +96,7 @@ def get_montana_chat_response(user_query):
                     text_knowledge += text_content
         
         # Gunakan model PRO (Lebih stabil untuk koneksi Streamlit Cloud)
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        model = genai.GenerativeModel('gemini-pro')
         
         full_prompt = f"Anda Montana AI. Gunakan data ini untuk menjawab: {text_knowledge[:15000]}\n\nUser: {user_query}"
         
