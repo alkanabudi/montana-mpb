@@ -6,3 +6,7 @@ oauth2client
 pypdf
 requests
 google-generativeai
+langchain
+langchain-google-genai
+langchain-community
+pypdf

@@ -4,10 +4,16 @@ import gspread
 import base64
 import json
 import requests
-import google.generativeai as genai
+import os
+import tempfile
 from io import BytesIO
-from pypdf import PdfReader
 from oauth2client.service_account import ServiceAccountCredentials
+
+# --- IMPORT LANGCHAIN ---
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_community.document_loaders import PyPDFLoader
+from langchain.chains.question_answering import load_qa_chain
+from langchain.prompts import PromptTemplate
 
 # --- 1. KONEKSI GOOGLE SHEETS ---
 def get_gspread_client():
@@ -26,7 +32,7 @@ def to_numeric_clean(series):
     s = series.astype(str).str.replace('Rp', '', regex=False).str.replace('.', '', regex=False).str.replace(',', '', regex=False).str.strip()
     return pd.to_numeric(s, errors='coerce').fillna(0)
 
-# --- 3. AMBIL DATA PENERIMAAN ---
+# --- 3. AMBIL DATA DARI GOOGLE SHEETS ---
 @st.cache_data(ttl=600)
 def get_data_from_google():
     client = get_gspread_client()
@@ -36,14 +42,12 @@ def get_data_from_google():
         list_of_lists = sheet.get_all_values()
         if not list_of_lists: return pd.DataFrame()
         df = pd.DataFrame(list_of_lists[1:], columns=list_of_lists[0])
-        df = df.loc[:, df.columns.str.strip() != ""]
         if "NOMINAL TAGIHAN" in df.columns:
             df["NOMINAL TAGIHAN"] = to_numeric_clean(df["NOMINAL TAGIHAN"])
         return df
     except:
         return pd.DataFrame()
 
-# --- 4. AMBIL DATA TERPROSES ---
 @st.cache_data(ttl=600)
 def get_data_mpb_2025():
     client = get_gspread_client()
@@ -53,7 +57,6 @@ def get_data_mpb_2025():
         list_of_lists = sheet.get_all_values()
         if not list_of_lists: return pd.DataFrame()
         df = pd.DataFrame(list_of_lists[1:], columns=list_of_lists[0])
-        df = df.loc[:, df.columns.str.strip() != ""]
         if "Nilai Tagihan" in df.columns:
             df["Nilai Tagihan"] = to_numeric_clean(df["Nilai Tagihan"])
             df["NOMINAL TAGIHAN"] = df["Nilai Tagihan"]
@@ -61,7 +64,6 @@ def get_data_mpb_2025():
     except:
         return pd.DataFrame()
 
-# --- 5. SIMPAN DATA ---
 def save_data_to_google(data_row):
     client = get_gspread_client()
     if client is None: return False
@@ -72,46 +74,53 @@ def save_data_to_google(data_row):
     except:
         return False
 
-# --- 6. AI MONTANA ---
+# --- 4. AI MONTANA (VERSI LANGCHAIN) ---
 def get_montana_chat_response(user_query):
     try:
-        genai.configure(api_key=st.secrets["gemini_api_key"])
-        
-        # --- DAFTAR MODEL TERBARU 2026 (Urutan Prioritas) ---
-        model_names = ['gemini-2.0-flash', 'gemini-1.5-flash-latest', 'gemini-pro']
-        
-        model = None
-        for name in model_names:
-            try:
-                model = genai.GenerativeModel(name)
-                # Tes kecil untuk memastikan model ini tersedia
-                model.generate_content("test", generation_config={"max_output_tokens": 1})
-                break 
-            except:
-                continue
-        
-        if model is None:
-            return "Montana sedang sinkronisasi server Google. Coba lagi dalam 1 menit."
+        # Inisialisasi LLM Gemini melalui LangChain
+        llm = ChatGoogleGenerativeAI(
+            model="gemini-1.5-flash",
+            google_api_key=st.secrets["gemini_api_key"],
+            temperature=0.3
+        )
 
-        # Ambil Data dari GDrive
-        file_id = "1jX-yVKyMmIuOOdx7Z-qpEtTYzn_RhNu1" 
+        # Ambil PDF dari GDrive
+        file_id = "1jX-yVKyMmIuOOdx7Z-qpEtTYzn_RhNu1"
         url = f'https://drive.google.com/uc?id={file_id}&export=download'
         
         headers = {'User-Agent': 'Mozilla/5.0'}
         resp = requests.get(url, headers=headers, timeout=15)
-        
-        text_knowledge = ""
-        if resp.status_code == 200 and b'%PDF' in resp.content[:4]:
-            reader = PdfReader(BytesIO(resp.content))
-            for page in reader.pages:
-                text_knowledge += page.extract_text()
-        else:
-            return "Montana gagal mengakses dokumen SOP. Pastikan link GDrive 'Anyone with link'."
 
-        prompt = f"Anda Montana AI. Jawablah berdasarkan data ini: {text_knowledge[:10000]}\n\nUser: {user_query}"
-        
-        ai_resp = model.generate_content(prompt)
-        return ai_resp.text
+        if resp.status_code == 200 and b'%PDF' in resp.content[:4]:
+            # Simpan sementara ke file lokal agar bisa dibaca PyPDFLoader
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
+                tmp_file.write(resp.content)
+                tmp_path = tmp_file.name
+            
+            # Load dan Split dokumen pakai LangChain
+            loader = PyPDFLoader(tmp_path)
+            pages = loader.load_and_split()
+            
+            # Hapus file sementara
+            os.remove(tmp_path)
+
+            # Buat Prompt Template agar Montana lebih pintar
+            template = """Anda adalah Montana, asisten AI PT Petrokimia Gresik yang ahli dalam aturan MPB.
+            Gunakan data SOP berikut untuk menjawab pertanyaan:
+            {context}
+            
+            Pertanyaan: {question}
+            Jawaban:"""
+            
+            PROMPT = PromptTemplate(template=template, input_variables=["context", "question"])
+            
+            # Jalankan Chain Tanya Jawab
+            chain = load_qa_chain(llm, chain_type="stuff", prompt=PROMPT)
+            response = chain.invoke({"input_documents": pages, "question": user_query})
+            
+            return response["output_text"]
+        else:
+            return "Montana gagal mengakses dokumen. Pastikan link GDrive 'Anyone with link'."
 
     except Exception as e:
-        return f"Sistem sedang pemeliharaan teknis. (Info: {str(e)})"
+        return f"Montana sedang re-sinkronisasi sistem. (Info: {str(e)})"
