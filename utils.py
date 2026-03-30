@@ -18,8 +18,7 @@ def get_gspread_client():
         creds_info = json.loads(decoded_bytes.decode("utf-8"))
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_info, scope)
         return gspread.authorize(creds)
-    except Exception as e:
-        st.error(f"Gagal koneksi GSheets: {e}")
+    except Exception:
         return None
 
 # --- 2. PEMBERSIH ANGKA ---
@@ -33,8 +32,7 @@ def get_data_from_google():
     client = get_gspread_client()
     if client is None: return pd.DataFrame()
     try:
-        nama_file = "Daftar Penerimaan TAGIHAN MEMO PERINTAH BAYAR (Jawaban)"
-        sheet = client.open(nama_file).get_worksheet(0)
+        sheet = client.open("Daftar Penerimaan TAGIHAN MEMO PERINTAH BAYAR (Jawaban)").get_worksheet(0)
         list_of_lists = sheet.get_all_values()
         if not list_of_lists: return pd.DataFrame()
         df = pd.DataFrame(list_of_lists[1:], columns=list_of_lists[0])
@@ -42,7 +40,7 @@ def get_data_from_google():
         if "NOMINAL TAGIHAN" in df.columns:
             df["NOMINAL TAGIHAN"] = to_numeric_clean(df["NOMINAL TAGIHAN"])
         return df
-    except Exception as e:
+    except:
         return pd.DataFrame()
 
 # --- 4. AMBIL DATA TERPROSES ---
@@ -51,8 +49,7 @@ def get_data_mpb_2025():
     client = get_gspread_client()
     if client is None: return pd.DataFrame()
     try:
-        nama_file_proses = "Memo Perintah Bayar 2025"
-        sheet = client.open(nama_file_proses).get_worksheet(0)
+        sheet = client.open("Memo Perintah Bayar 2025").get_worksheet(0)
         list_of_lists = sheet.get_all_values()
         if not list_of_lists: return pd.DataFrame()
         df = pd.DataFrame(list_of_lists[1:], columns=list_of_lists[0])
@@ -61,7 +58,7 @@ def get_data_mpb_2025():
             df["Nilai Tagihan"] = to_numeric_clean(df["Nilai Tagihan"])
             df["NOMINAL TAGIHAN"] = df["Nilai Tagihan"]
         return df
-    except Exception as e:
+    except:
         return pd.DataFrame()
 
 # --- 5. SIMPAN DATA ---
@@ -69,32 +66,28 @@ def save_data_to_google(data_row):
     client = get_gspread_client()
     if client is None: return False
     try:
-        nama_file = "Daftar Penerimaan TAGIHAN MEMO PERINTAH BAYAR (Jawaban)"
-        sheet = client.open(nama_file).get_worksheet(0)
+        sheet = client.open("Daftar Penerimaan TAGIHAN MEMO PERINTAH BAYAR (Jawaban)").get_worksheet(0)
         sheet.append_row(data_row)
         return True
-    except Exception:
+    except:
         return False
 
-# --- 6. AI MONTANA (PDF GDRIVE) ---
+# --- 6. AI MONTANA ---
 def get_montana_chat_response(user_query):
     try:
         genai.configure(api_key=st.secrets["gemini_api_key"])
-        # ID File PDF dari GDrive Mas Bram
         file_id = "1jX-yVKyMmIuOOdx7Z-qpEtTYzn_RhNu1" 
         url = f'https://drive.google.com/uc?id={file_id}'
-        
         text_knowledge = ""
-        response = requests.get(url)
-        if response.status_code == 200:
-            pdf_file = BytesIO(response.content)
-            reader = PdfReader(pdf_file)
+        resp = requests.get(url)
+        if resp.status_code == 200:
+            reader = PdfReader(BytesIO(resp.content))
             for page in reader.pages:
                 text_knowledge += page.extract_text()
         
         model = genai.GenerativeModel('gemini-1.5-flash')
-        prompt = f"Anda Montana AI. Jawab pertanyaan berdasarkan dokumen ini: {text_knowledge}\n\nUser: {user_query}"
+        prompt = f"Anda Montana AI. Jawablah pertanyaan user berdasarkan dokumen ini: {text_knowledge}\n\nUser: {user_query}"
         ai_resp = model.generate_content(prompt)
         return ai_resp.text
     except Exception as e:
-        return f"Sistem AI sedang pemeliharaan. ({str(e)})"
+        return f"AI sedang tidak tersedia ({str(e)})"
