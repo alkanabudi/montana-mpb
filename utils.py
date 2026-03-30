@@ -4,23 +4,10 @@ import gspread
 import base64
 import json
 import requests
-import os
-import tempfile
+import google.generativeai as genai
 from io import BytesIO
+from pypdf import PdfReader
 from oauth2client.service_account import ServiceAccountCredentials
-
-# --- REVISI IMPORT LANGCHAIN TERBARU (ANTI-ERROR 2026) ---
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_community.document_loaders import PyPDFLoader
-
-# Cara panggil PromptTemplate & QA Chain di versi terbaru
-try:
-    from langchain_core.prompts import PromptTemplate
-    from langchain.chains.question_answering import load_qa_chain
-except ImportError:
-    # Backup jika versi library di server berbeda
-    from langchain.prompts import PromptTemplate
-    from langchain.chains import load_qa_chain
 
 # --- 1. KONEKSI GOOGLE SHEETS ---
 def get_gspread_client():
@@ -81,53 +68,42 @@ def save_data_to_google(data_row):
     except:
         return False
 
-# --- 4. AI MONTANA (VERSI LANGCHAIN) ---
+# --- 4. AI MONTANA (VERSI NATIVE STABIL) ---
 def get_montana_chat_response(user_query):
     try:
-        # Inisialisasi LLM Gemini melalui LangChain
-        llm = ChatGoogleGenerativeAI(
-            model="gemini-1.5-flash",
-            google_api_key=st.secrets["gemini_api_key"],
-            temperature=0.3
-        )
+        # Inisialisasi Gemini
+        genai.configure(api_key=st.secrets["gemini_api_key"])
+        model = genai.GenerativeModel('gemini-1.5-flash-latest')
 
         # Ambil PDF dari GDrive
-        file_id = "1jX-yVKyMmIuOOdx7Z-qpEtTYzn_RhNu1"
+        file_id = "1jX-yVKyMmIuOOdx7Z-qpEtTYzn_RhNu1" 
         url = f'https://drive.google.com/uc?id={file_id}&export=download'
         
-        headers = {'User-Agent': 'Mozilla/5.0'}
-        resp = requests.get(url, headers=headers, timeout=15)
+        resp = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=15)
+        
+        text_knowledge = ""
+        if resp.status_code == 200:
+            pdf_file = BytesIO(resp.content)
+            reader = PdfReader(pdf_file)
+            for page in reader.pages:
+                text_content = page.extract_text()
+                if text_content:
+                    text_knowledge += text_content
+        
+        context = text_knowledge[:15000] # Batasi biar gak boros token
 
-        if resp.status_code == 200 and b'%PDF' in resp.content[:4]:
-            # Simpan sementara ke file lokal agar bisa dibaca PyPDFLoader
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
-                tmp_file.write(resp.content)
-                tmp_path = tmp_file.name
-            
-            # Load dan Split dokumen pakai LangChain
-            loader = PyPDFLoader(tmp_path)
-            pages = loader.load_and_split()
-            
-            # Hapus file sementara
-            os.remove(tmp_path)
+        prompt = f"""Anda adalah Montana, asisten AI PT Petrokimia Gresik. 
+        Gunakan data SOP berikut untuk menjawab pertanyaan user. 
+        Jika tidak ada di data, jawablah dengan sopan bahwa Anda hanya tahu seputar aturan MPB.
 
-            # Buat Prompt Template agar Montana lebih pintar
-            template = """Anda adalah Montana, asisten AI PT Petrokimia Gresik yang ahli dalam aturan MPB.
-            Gunakan data SOP berikut untuk menjawab pertanyaan:
-            {context}
-            
-            Pertanyaan: {question}
-            Jawaban:"""
-            
-            PROMPT = PromptTemplate(template=template, input_variables=["context", "question"])
-            
-            # Jalankan Chain Tanya Jawab
-            chain = load_qa_chain(llm, chain_type="stuff", prompt=PROMPT)
-            response = chain.invoke({"input_documents": pages, "question": user_query})
-            
-            return response["output_text"]
-        else:
-            return "Montana gagal mengakses dokumen. Pastikan link GDrive 'Anyone with link'."
+        DATA SOP:
+        {context}
+        
+        Pertanyaan User: {user_query}
+        Jawaban:"""
+        
+        ai_resp = model.generate_content(prompt)
+        return ai_resp.text
 
     except Exception as e:
-        return f"Montana sedang re-sinkronisasi sistem. (Info: {str(e)})"
+        return f"Montana sedang istirahat sejenak. (Pesan: {str(e)})"
