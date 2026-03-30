@@ -77,22 +77,36 @@ def get_montana_chat_response(user_query):
     try:
         genai.configure(api_key=st.secrets["gemini_api_key"])
         
-        # --- JURUS ANTI-GAGAL: COBA PRO DULU, KALAU GAGAL PAKAI FLASH ---
-        try:
-            model = genai.GenerativeModel('gemini-pro')
-        except:
-            model = genai.GenerativeModel('gemini-1.5-flash')
+        # --- DAFTAR MODEL TERBARU 2026 (Urutan Prioritas) ---
+        model_names = ['gemini-2.0-flash', 'gemini-1.5-flash-latest', 'gemini-pro']
         
+        model = None
+        for name in model_names:
+            try:
+                model = genai.GenerativeModel(name)
+                # Tes kecil untuk memastikan model ini tersedia
+                model.generate_content("test", generation_config={"max_output_tokens": 1})
+                break 
+            except:
+                continue
+        
+        if model is None:
+            return "Montana sedang sinkronisasi server Google. Coba lagi dalam 1 menit."
+
         # Ambil Data dari GDrive
         file_id = "1jX-yVKyMmIuOOdx7Z-qpEtTYzn_RhNu1" 
         url = f'https://drive.google.com/uc?id={file_id}&export=download'
         
-        resp = requests.get(url, timeout=10)
+        headers = {'User-Agent': 'Mozilla/5.0'}
+        resp = requests.get(url, headers=headers, timeout=15)
+        
         text_knowledge = ""
-        if resp.status_code == 200:
+        if resp.status_code == 200 and b'%PDF' in resp.content[:4]:
             reader = PdfReader(BytesIO(resp.content))
             for page in reader.pages:
                 text_knowledge += page.extract_text()
+        else:
+            return "Montana gagal mengakses dokumen SOP. Pastikan link GDrive 'Anyone with link'."
 
         prompt = f"Anda Montana AI. Jawablah berdasarkan data ini: {text_knowledge[:10000]}\n\nUser: {user_query}"
         
@@ -100,4 +114,4 @@ def get_montana_chat_response(user_query):
         return ai_resp.text
 
     except Exception as e:
-        return f"Montana sedang loading... (Pesan: {str(e)})"
+        return f"Sistem sedang pemeliharaan teknis. (Info: {str(e)})"
