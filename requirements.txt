@@ -3,8 +3,5 @@ pandas
 gspread
 oauth2client
 google-generativeai
-langchain
-langchain-google-genai
-langchain-community
 pypdf
 requests
