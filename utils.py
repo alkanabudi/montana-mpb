@@ -28,36 +28,43 @@ def to_numeric_clean(series):
 
 # --- 3. AMBIL DATA DARI GOOGLE SHEETS ---
 @st.cache_data(ttl=60)
-def get_data_from_google():
+def get_data_mpb_2025():
     client = get_gspread_client()
     if client is None: return pd.DataFrame()
     try:
-        sheet = client.open("Daftar Penerimaan TAGIHAN MEMO PERINTAH BAYAR (Jawaban)").get_worksheet(0)
+        sheet = client.open("Memo Perintah Bayar 2025").get_worksheet(0)
         list_of_lists = sheet.get_all_values()
         
-        if len(list_of_lists) <= 1:
-            return pd.DataFrame({"NOMINAL TAGIHAN": [0], "NAMA UNIT": ["Belum Ada Data"]})
+        if not list_of_lists or len(list_of_lists) <= 1:
+            return pd.DataFrame()
             
-        # Ambil Header
-        headers = list_of_lists[0]
-        
-        # --- JURUS PEMBERSIH DUPLIKAT ---
+        # --- PROSES HEADER AGAR TIDAK DUPLIKAT ---
+        raw_headers = list_of_lists[0]
         clean_headers = []
-        for i, h in enumerate(headers):
-            # Jika judul kosong, kasih nama 'Kolom_i'
-            new_h = h if h.strip() != "" else f"Kolom_{i}"
-            # Jika nama sudah ada sebelumnya, tambahkan angka di belakangnya
+        for i, h in enumerate(raw_headers):
+            new_h = h.strip()
+            # Jika kolom kosong, kasih nama 'Kolom_X'
+            if new_h == "":
+                new_h = f"Kolom_{i}"
+            # Jika nama sudah ada sebelumnya (duplikat), tambahkan angka urutan
             if new_h in clean_headers:
                 new_h = f"{new_h}_{i}"
             clean_headers.append(new_h)
             
         df = pd.DataFrame(list_of_lists[1:], columns=clean_headers)
         
-        if "NOMINAL TAGIHAN" in df.columns:
-            df["NOMINAL TAGIHAN"] = to_numeric_clean(df["NOMINAL TAGIHAN"])
+        # Bersihkan nominal jika kolomnya ada
+        target_col = "Nilai Tagihan" if "Nilai Tagihan" in df.columns else "NOMINAL TAGIHAN"
+        if target_col in df.columns:
+            df[target_col] = to_numeric_clean(df[target_col])
+            df["NOMINAL TAGIHAN"] = df[target_col] # Seragamkan nama untuk dashboard
+            
         return df
     except Exception as e:
-        return pd.DataFrame({"NOMINAL TAGIHAN": [0], "NAMA UNIT": [f"Error: {str(e)}"]})
+        # Kirim dataframe kosong saja jika error agar dashboard tidak mati total
+        return pd.DataFrame()
+    
+    
 @st.cache_data(ttl=60)
 def get_data_mpb_2025():
     client = get_gspread_client()
