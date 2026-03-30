@@ -26,80 +26,88 @@ try:
     df_raw = get_data_from_google()
     df_proc = get_data_mpb_2025()
 
-    # --- 2. PRE-PROCESSING WAKTU ---
-    col_tgl_hist = df_raw.columns[0]
-    df_raw[col_tgl_hist] = pd.to_datetime(df_raw[col_tgl_hist], errors='coerce')
+    # --- 2. CEK DATA KOSONG (PAGAR PENGAMAN) ---
+    # Jika df_raw kosong, kita tampilkan peringatan dan STOP kode di sini agar tidak error ke bawah
+    if df_raw.empty:
+        st.warning("⚠️ Data Penerimaan di Google Sheets masih kosong.")
+        st.info("Silakan masukkan data melalui menu Input Tagihan atau isi Google Sheets Anda.")
+        
+        # Tampilkan metrik nol agar dashboard tidak terlihat rusak
+        m1, m2, m3, m4 = st.columns(4)
+        m1.metric("Total Penerimaan", "0 Memo")
+        m2.metric("Total Proses", "0 Memo")
+        m3.metric("Nilai Penerimaan", "Rp 0")
+        m4.metric("Nilai Proses", "Rp 0")
+        
+        st.stop() # BERHENTI DI SINI
+
+    # --- 3. PRE-PROCESSING WAKTU (Hanya jalan jika data ADA) ---
+    # Gunakan pengecekan kolom agar tidak error index
+    if len(df_raw.columns) > 0:
+        col_tgl_hist = df_raw.columns[0]
+        df_raw[col_tgl_hist] = pd.to_datetime(df_raw[col_tgl_hist], errors='coerce')
     
     col_tgl_proc = "Tanggal Dokumen Masuk Akuntansi"
     if not df_proc.empty and col_tgl_proc in df_proc.columns:
         df_proc[col_tgl_proc] = pd.to_datetime(df_proc[col_tgl_proc], errors='coerce')
 
-    # --- 3. METRIK KPI UTAMA ---
+    # --- 4. METRIK KPI UTAMA ---
     st.markdown("### 📊 Ringkasan Performa Keseluruhan")
     m1, m2, m3, m4 = st.columns(4)
     
+    # Hitung Metrik dengan aman
+    count_raw = len(df_raw)
+    count_proc = len(df_proc) if not df_proc.empty else 0
+    
+    nom_hist = df_raw["NOMINAL TAGIHAN"].sum() if "NOMINAL TAGIHAN" in df_raw.columns else 0
+    nom_proc = df_proc["Nilai Tagihan"].sum() if (not df_proc.empty and "Nilai Tagihan" in df_proc.columns) else 0
+
     with m1:
-        st.metric("Total Penerimaan", f"{len(df_raw)} Memo")
+        st.metric("Total Penerimaan", f"{count_raw} Memo")
     
     with m2:
-        st.metric("Total Proses", f"{len(df_proc)} Memo")
+        st.metric("Total Proses", f"{count_proc} Memo")
     
     with m3:
-        if "NOMINAL TAGIHAN" in df_raw.columns:
-            df_raw["NOMINAL TAGIHAN"] = pd.to_numeric(df_raw["NOMINAL TAGIHAN"], errors='coerce').fillna(0)
-            nom_hist = df_raw["NOMINAL TAGIHAN"].sum()
-        else: 
-            nom_hist = 0
         st.metric("Nilai Penerimaan", f"Rp {nom_hist:,.0f}".replace(",", "."))
     
     with m4:
-        if not df_proc.empty and "Nilai Tagihan" in df_proc.columns:
-            df_proc["Nilai Tagihan"] = pd.to_numeric(df_proc["Nilai Tagihan"], errors='coerce').fillna(0)
-            nom_proc = df_proc["Nilai Tagihan"].sum()
-        else: 
-            nom_proc = 0
         st.metric("Nilai Proses", f"Rp {nom_proc:,.0f}".replace(",", "."))
 
     st.divider()
 
-    # --- 4. TABEL RINGKASAN TRANSAKSI TERAKHIR ---
+    # --- 5. TABEL RINGKASAN TRANSAKSI TERAKHIR ---
     st.markdown("### 🕒 Transaksi Terkini")
     tab_h, tab_p = st.tabs(["📌 5 Transaksi Terakhir (Penerimaan)", "📄 5 Transaksi Terakhir (Proses)"])
 
     with tab_h:
-        if not df_raw.empty:
-            # Ambil 5 terakhir, lalu balik urutan (terbaru di atas)
-            latest_h = df_raw.tail(5).iloc[::-1]
+        # Tambahan filter agar baris dummy "Belum Ada Data" tidak muncul
+        clean_h = df_raw[df_raw.iloc[:, 1] != "Belum Ada Data"] if len(df_raw) > 0 else df_raw
+        
+        if not clean_h.empty:
+            latest_h = clean_h.tail(5).iloc[::-1]
             st.dataframe(
                 latest_h, 
                 use_container_width=True, 
-                hide_index=True,
-                column_config={
-                    "NOMINAL TAGIHAN": st.column_config.NumberColumn(format="Rp %d"),
-                    col_tgl_hist: st.column_config.DatetimeColumn(format="DD/MM/YYYY HH:mm:ss")
-                }
+                hide_index=True
             )
         else:
-            st.info("Data penerimaan kosong.")
+            st.info("Belum ada transaksi penerimaan.")
 
     with tab_p:
         if not df_proc.empty:
-            # Ambil 5 terakhir, lalu balik urutan (terbaru di atas)
             latest_p = df_proc.tail(5).iloc[::-1]
             st.dataframe(
                 latest_p, 
                 use_container_width=True, 
-                hide_index=True,
-                column_config={
-                    "Nilai Tagihan": st.column_config.NumberColumn(format="Rp %d"),
-                    col_tgl_proc: st.column_config.DatetimeColumn(format="DD/MM/YYYY HH:mm:ss")
-                }
+                hide_index=True
             )
         else:
-            st.info("Data proses SAP kosong.")
+            st.info("Belum ada transaksi proses SAP.")
 
 except Exception as e:
-    st.error(f"Terjadi kesalahan saat memuat dashboard: {e}")
+    # Error log yang lebih spesifik untuk memudahkan Mas Bram debug
+    st.error(f"Terjadi kesalahan teknis pada Dashboard: {str(e)}")
 
 # --- FOOTER ---
 st.sidebar.markdown("---")
