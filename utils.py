@@ -34,7 +34,11 @@ def get_data_from_google():
     try:
         sheet = client.open("Daftar Penerimaan TAGIHAN MEMO PERINTAH BAYAR (Jawaban)").get_worksheet(0)
         list_of_lists = sheet.get_all_values()
-        if not list_of_lists: return pd.DataFrame()
+        
+        # Cek jika data kosong atau hanya judul kolom
+        if len(list_of_lists) <= 1: 
+            return pd.DataFrame() 
+            
         df = pd.DataFrame(list_of_lists[1:], columns=list_of_lists[0])
         if "NOMINAL TAGIHAN" in df.columns:
             df["NOMINAL TAGIHAN"] = to_numeric_clean(df["NOMINAL TAGIHAN"])
@@ -49,7 +53,10 @@ def get_data_mpb_2025():
     try:
         sheet = client.open("Memo Perintah Bayar 2025").get_worksheet(0)
         list_of_lists = sheet.get_all_values()
-        if not list_of_lists: return pd.DataFrame()
+        
+        if len(list_of_lists) <= 1:
+            return pd.DataFrame()
+
         df = pd.DataFrame(list_of_lists[1:], columns=list_of_lists[0])
         if "Nilai Tagihan" in df.columns:
             df["Nilai Tagihan"] = to_numeric_clean(df["Nilai Tagihan"])
@@ -71,11 +78,9 @@ def save_data_to_google(data_row):
 # --- 4. AI MONTANA (VERSI NATIVE STABIL) ---
 def get_montana_chat_response(user_query):
     try:
-        # Inisialisasi Gemini
         genai.configure(api_key=st.secrets["gemini_api_key"])
         model = genai.GenerativeModel('gemini-1.5-flash-latest')
 
-        # Ambil PDF dari GDrive
         file_id = "1jX-yVKyMmIuOOdx7Z-qpEtTYzn_RhNu1" 
         url = f'https://drive.google.com/uc?id={file_id}&export=download'
         
@@ -90,11 +95,11 @@ def get_montana_chat_response(user_query):
                 if text_content:
                     text_knowledge += text_content
         
-        context = text_knowledge[:15000] # Batasi biar gak boros token
+        context = text_knowledge[:15000]
 
         prompt = f"""Anda adalah Montana, asisten AI PT Petrokimia Gresik. 
-        Gunakan data SOP berikut untuk menjawab pertanyaan user. 
-        Jika tidak ada di data, jawablah dengan sopan bahwa Anda hanya tahu seputar aturan MPB.
+        Gunakan data SOP berikut untuk menjawab pertanyaan user secara akurat.
+        Jika informasi tidak ada di SOP, katakan bahwa Anda belum memiliki datanya.
 
         DATA SOP:
         {context}
@@ -104,6 +109,5 @@ def get_montana_chat_response(user_query):
         
         ai_resp = model.generate_content(prompt)
         return ai_resp.text
-
     except Exception as e:
         return f"Montana sedang istirahat sejenak. (Pesan: {str(e)})"
