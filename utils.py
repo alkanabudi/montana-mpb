@@ -9,10 +9,10 @@ import tempfile
 from io import BytesIO
 from oauth2client.service_account import ServiceAccountCredentials
 
-# --- IMPORT LANGCHAIN ---
+# --- MPORT LANGCHAIN TERBARU ---
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_community.document_loaders import PyPDFLoader
-from langchain.chains.question_answering import load_qa_chain
+from langchain.chains import load_qa_chain # Hapus '.question_answering'
 from langchain.prompts import PromptTemplate
 
 # --- 1. KONEKSI GOOGLE SHEETS ---
