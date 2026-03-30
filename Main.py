@@ -1,39 +1,84 @@
 import streamlit as st
 
-# 1. Konfigurasi Halaman
+# 1. Konfigurasi Halaman Dasar
 st.set_page_config(
     page_title="MONTANA System", 
     layout="centered", 
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed"
 )
 
-# --- CSS UNTUK LOGIN CLEAN ---
-hide_elements = """
+# --- CSS REVISI FINAL: TYPOGRAPHY BOLD & CLEAN ---
+image_url = "https://storage.googleapis.com/pkg-portal-bucket/images/PG_website1_Kantor-Pusat-Petrokimia-Gresik.jpeg"
+
+final_style = f"""
     <style>
-    .stAppHeader {visibility: hidden;}
-    [data-testid="stSidebar"] {display: none;}
-    [data-testid="stSidebarNav"] {display: none;}
+    .stAppHeader {{ visibility: hidden; }}
     
-    .stApp {
-        background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-    }
+    .stApp {{
+        background-image: url("{image_url}");
+        background-size: cover;
+        background-position: center;
+        background-attachment: fixed;
+    }}
     
-    /* Box Login Putih */
-    div[data-testid="stVerticalBlock"] > div:has(input) {
-        background-color: white;
-        padding: 40px;
-        border-radius: 20px;
-        box-shadow: 0 10px 25px rgba(0,0,0,0.3);
-    }
+    /* JUDUL UTAMA (MONTANA MPB) */
+    .main-title {{
+        font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        font-size: 3.5rem !important;
+        font-weight: 850 !important;
+        color: #FFFFFF !important;
+        text-align: center;
+        text-transform: uppercase;
+        letter-spacing: 5px;
+        margin-bottom: 0px;
+        text-shadow: 3px 3px 10px rgba(0,0,0,0.8);
+    }}
     
-    .stTextInput label { color: #1e293b !important; font-weight: bold; }
-    h2, p { color: #1e293b !important; }
-    
-    /* Sembunyikan border form standar Streamlit agar lebih clean */
-    [data-testid="stForm"] {
-        border: none;
-        padding: 0;
-    }
+    /* SUB-JUDUL (GELAP & TAJAM) */
+    .sub-title {{
+        font-family: 'Segoe UI', sans-serif;
+        font-size: 1.2rem !important;
+        font-weight: 600 !important;
+        color: #1e293b !important;
+        text-align: center;
+        letter-spacing: 1px;
+        margin-top: -10px;
+        margin-bottom: 40px;
+        text-shadow: 0px 0px 8px rgba(255,255,255,0.8);
+    }}
+
+    /* KOTAK LOGIN TRANSPARAN */
+    [data-testid="stForm"] {{
+        background: rgba(15, 23, 42, 0.4) !important;
+        backdrop-filter: blur(15px) !important;
+        -webkit-backdrop-filter: blur(15px) !important;
+        padding: 45px !important;
+        border-radius: 25px !important;
+        border: 1px solid rgba(255, 255, 255, 0.2) !important;
+        box-shadow: 0 20px 50px rgba(0,0,0,0.7) !important;
+        max-width: 500px !important;
+        margin: auto !important;
+    }}
+
+    .stTextInput label {{
+        color: #ffffff !important;
+        font-size: 1rem !important;
+        font-weight: 600 !important;
+        margin-bottom: 8px;
+    }}
+
+    .stButton>button {{
+        background-color: #0284c7 !important;
+        color: white !important;
+        font-weight: 700 !important;
+        height: 50px !important;
+        border-radius: 12px !important;
+        border: none !important;
+        margin-top: 15px !important;
+    }}
+
+    /* Sembunyikan Navigasi & Sidebar saat Login */
+    [data-testid="stSidebar"], [data-testid="stSidebarNav"] {{ display: none; }}
     </style>
 """
 
@@ -45,23 +90,21 @@ if "role" not in st.session_state:
 
 # --- HALAMAN LOGIN ---
 if not st.session_state.logged_in:
-    st.markdown(hide_elements, unsafe_allow_html=True)
+    st.markdown(final_style, unsafe_allow_html=True)
     
-    col1, col2, col3 = st.columns([0.5, 2, 0.5])
+    st.markdown("<br><br>", unsafe_allow_html=True)
+    
+    # Judul & Subjudul
+    st.markdown('<p class="main-title">MONTANA MPB</p>', unsafe_allow_html=True)
+    st.markdown('<p class="sub-title">Monitoring Analitik Tagihan Internal MPB</p>', unsafe_allow_html=True)
+    
+    col1, col2, col3 = st.columns([0.1, 1, 0.1])
     
     with col2:
-        st.markdown("<div style='text-align: center;'>", unsafe_allow_html=True)
-        st.image("https://cdn-icons-png.flaticon.com/512/785/785116.png", width=70) 
-        st.markdown("<h2 style='margin-bottom:0;'>MONTANA MPB</h2>", unsafe_allow_html=True)
-        st.markdown("<p style='font-size:0.8em; margin-bottom:20px;'>Monitoring Analitik Tagihan Internal MPB</p>", unsafe_allow_html=True)
-        
-        # --- IMPLEMENTASI FORM UNTUK FITUR ENTER ---
         with st.form("login_form"):
             user = st.text_input("Username", placeholder="Masukkan username")
             pwd = st.text_input("Password", type="password", placeholder="Masukkan password")
-            
-            # Gunakan form_submit_button agar Enter berfungsi
-            submitted = st.form_submit_button("MASUK SISTEM", use_container_width=True, type="primary")
+            submitted = st.form_submit_button("MASUK SISTEM", use_container_width=True)
             
             if submitted:
                 if user == "admin" and pwd == "admin123":
@@ -74,46 +117,60 @@ if not st.session_state.logged_in:
                     st.rerun()
                 else:
                     st.error("Kredensial salah!")
-        
-        st.markdown("<p style='text-align: center; font-size: 0.7em; margin-top: 20px; color: #64748b;'>developed by Alkana</p>", unsafe_allow_html=True)
-        st.markdown("</div>", unsafe_allow_html=True)
 
-# --- SISTEM NAVIGASI (SETELAH LOGIN) ---
+    st.markdown("<p style='text-align: center; font-size: 0.8em; margin-top: 50px; color: white; opacity: 0.8; text-shadow: 1px 1px 2px black;'>developed by Alkana @ 2026<br>PT Petrokimia Gresik</p>", unsafe_allow_html=True)
+
+
 else:
-    # Suntikkan CSS WIDE LAYOUT
-    st.markdown("""
-        <style>
-        .appview-container .main .block-container {
-            max-width: 95% !important;
-            padding-top: 1rem !important;
-            padding-right: 1rem !important;
-            padding-left: 1rem !important;
-        }
-        .stAppHeader {visibility: visible !important;}
-        [data-testid="stSidebar"] {display: flex !important;}
-        </style>
-    """, unsafe_allow_html=True)
+    # --- JURUS SECURITY: SEMBUNYIKAN TOTAL UNTUK UNIT ---
+    if st.session_state.role == "UNIT":
+        st.markdown("""
+            <style>
+            #MainMenu, header, footer, .stAppDeployButton, [data-testid="stStatusWidget"], #manage-app-button, button[title="View source on GitHub"] {
+                visibility: hidden !important; display: none !important;
+            }
+            .appview-container .main .block-container {
+                max-width: 95% !important; padding-top: 1rem !important;
+            }
+            [data-testid="stSidebar"] {display: flex !important;}
+            </style>
+        """, unsafe_allow_html=True)
+    else:
+        # Style khusus ADMIN
+        st.markdown("""
+            <style>
+            .appview-container .main .block-container {
+                max-width: 95% !important; padding-top: 1rem !important;
+            }
+            .stAppHeader {visibility: visible !important;}
+            [data-testid="stSidebar"] {display: flex !important;}
+            .stAppDeployButton {display:none;}
+            </style>
+        """, unsafe_allow_html=True)
 
-    # Definisi Halaman
+    # 1. Definisi Halaman (Pastikan file-file ini ada di folder views)
     pg_dash  = st.Page("views/02_Dashboard.py", title="Dashboard", icon="🏠")
     pg_tren  = st.Page("views/03_Analisis_Tren.py", title="Analisis Tren", icon="📈")
     pg_input = st.Page("views/01_Input_Data.py", title="Input Data", icon="➕")
     pg_hist  = st.Page("views/04_History.py", title="History Penerimaan", icon="📜")
     pg_proc  = st.Page("views/05_Tagihan_Proses.py", title="Tagihan Proses", icon="📑")
 
-    # Routing Role
+    # 2. Routing berdasarkan Role
     if st.session_state.role == "ADMIN":
         menu = {
             "Monitoring": [pg_dash, pg_tren, pg_hist, pg_proc],
             "Transaksi": [pg_input]
         }
     else:
+        # Role UNIT hanya bisa input dan lihat proses
         menu = {"Layanan": [pg_input, pg_proc]}
 
-    # Jalankan Navigasi
+    # 3. Inisialisasi Navigasi
     pg = st.navigation(menu, position="sidebar")
     
+    # 4. Tampilkan Sidebar Custom (Logout Button)
     with st.sidebar:
+        st.markdown(f"### 👤 {st.session_state.role}")
         st.write(f"Logged in as: **{st.session_state.role}**")
         if st.button("🚪 Keluar Sistem", use_container_width=True):
             st.session_state.logged_in = False
@@ -121,4 +178,5 @@ else:
             st.rerun()
         st.divider()
 
+    # 5. JALANKAN HALAMAN (PENTING: Tanpa ini, halaman tidak akan muncul)
     pg.run()

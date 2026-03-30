@@ -3,3 +3,6 @@ pandas
 plotly
 gspread
 oauth2client
+pypdf
+requests
+google-generativeai

@@ -1,3 +1,14 @@
+# Kredensial Rahasia
+credentials.json
 credentials.json.json
+newcredentials.json
+*.json
+
+# Folder Python & Sampah
 venv/
+.venv/
 __pycache__/
+*.pyc
+
+# Folder Streamlit Lokal
+.streamlit/
