@@ -96,7 +96,7 @@ def save_data_to_google(data_row):
 def get_montana_chat_response(user_query):
     try:
         genai.configure(api_key="AIzaSyCjDPCw62gKc8kLa7rWp767AiUp7FMV5zQ")
-        model = genai.GenerativeModel('gemini-1.5-flash-latest')
+        model = genai.GenerativeModel('gemini-pro')
         file_id = "1jX-yVKyMmIuOOdx7Z-qpEtTYzn_RhNu1" 
         url = f'https://drive.google.com/uc?id={file_id}&export=download'
         resp = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=15)
