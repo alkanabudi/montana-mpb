@@ -65,10 +65,21 @@ def get_data_from_google():
         sheet = client.open("Daftar Penerimaan TAGIHAN MEMO PERINTAH BAYAR (Jawaban)").get_worksheet(0)
         df = get_clean_df(sheet.get_all_values())
         
+        # --- LOGIKA PENGURUTAN WAKTU ---
+        if "Waktu" in df.columns:
+            # Ubah kolom Waktu ke format datetime agar bisa diurutkan dengan benar
+            df["Waktu"] = pd.to_datetime(df["Waktu"], errors='coerce')
+            # Urutkan berdasarkan Waktu secara descending (Terbaru di atas)
+            df = df.sort_values(by="Waktu", ascending=False)
+            # Kembalikan ke format teks biasa agar enak dilihat di tabel
+            df["Waktu"] = df["Waktu"].dt.strftime('%d/%m/%Y %H:%M:%S')
+        
         if "NOMINAL TAGIHAN" in df.columns:
             df["NOMINAL TAGIHAN"] = to_numeric_clean(df["NOMINAL TAGIHAN"])
+            
         return df
-    except:
+    except Exception as e:
+        st.error(f"Gagal urutkan data: {e}")
         return pd.DataFrame()
 
 @st.cache_data(ttl=60)
