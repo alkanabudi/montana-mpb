@@ -10,6 +10,7 @@ st.set_page_config(
 # --- CSS GLOBAL: LOGIN & UI ---
 image_url = "https://storage.googleapis.com/pkg-portal-bucket/images/PG_website1_Kantor-Pusat-Petrokimia-Gresik.jpeg"
 
+# Perhatikan penggunaan {{ dan }} di bawah ini
 final_style = f"""
     <style>
     .stAppHeader {{ visibility: hidden; }}
@@ -22,21 +23,20 @@ final_style = f"""
         background-attachment: fixed;
     }}
     
-    /* JUDUL UTAMA (MONTANA MPB) - NAVY BLUE KONTRAS */
+    /* JUDUL UTAMA (MONTANA MPB) */
     .main-title {{
         font-family: 'Segoe UI', Roboto, sans-serif;
         font-size: 3.8rem !important;
         font-weight: 850 !important;
-        color: #002D62 !important; /* Navy Blue Profesional */
+        color: #002D62 !important; 
         text-align: center;
         text-transform: uppercase;
         letter-spacing: 5px;
         margin-bottom: 0px;
-        /* Shadow putih halus agar teks 'lepas' dari background langit */
         text-shadow: 2px 2px 8px rgba(255, 255, 255, 0.8);
     }}
     
-    /* SUB-DESKRIPSI - NAVY BLUE */
+    /* SUB-DESKRIPSI */
     .sub-title {{
         color: #002D62 !important;
         text-align: center;
@@ -45,11 +45,11 @@ final_style = f"""
         margin-top: -10px;
         margin-bottom: 30px;
         text-shadow: 1px 1px 5px rgba(255, 255, 255, 0.6);
-    }
+    }}
 
     /* KOTAK LOGIN TRANSPARAN */
     [data-testid="stForm"] {{
-        background: rgba(255, 255, 255, 0.2) !important; /* Lebih terang agar kontras */
+        background: rgba(255, 255, 255, 0.2) !important;
         backdrop-filter: blur(20px) !important;
         padding: 40px !important;
         border-radius: 20px !important;
