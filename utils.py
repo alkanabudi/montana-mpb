@@ -127,7 +127,7 @@ def get_montana_chat_response(user_query):
             pass
 
         # Panggil Model (Gunakan yang paling standar)
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        model = genai.GenerativeModel('gemini-pro')
         
         prompt = f"Anda Montana, AI Petrokimia. Jawab ringkas dari data ini: {text_knowledge[:10000]}\n\nUser: {user_query}"
         response = model.generate_content(prompt)
