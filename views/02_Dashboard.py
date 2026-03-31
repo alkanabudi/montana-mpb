@@ -85,7 +85,7 @@ try:
     st.markdown("### 🕒 Transaksi Terkini")
     tab_h, tab_p = st.tabs(["📌 5 Transaksi Terakhir (Penerimaan)", "📄 5 Transaksi Terakhir (Proses)"])
 
-with tab_h:
+    with tab_h:
         # 1. Pastikan kolom Waktu terbaca sebagai tanggal untuk sorting
         # Kita asumsikan kolom pertama (index 0) adalah Waktu/Timestamp
         col_waktu = clean_h.columns[0] 
