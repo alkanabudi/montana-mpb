@@ -23,95 +23,80 @@ st.title("🏠 Dashboard Ringkasan Performa MPB")
 
 try:
     # --- 1. AMBIL DATA ---
-    df_raw = get_data_from_google()
-    df_proc = get_data_mpb_2025()
-
-    df_raw = get_data_from_google()
-    if not df_raw.empty:
-    # Ganti 'None' atau NaN dengan string kosong agar tidak muncul tulisan None di tabel
-    df_raw = df_raw.fillna("")
+    df_raw_base = get_data_from_google()
+    df_proc_base = get_data_mpb_2025()
 
     # --- 2. CEK DATA KOSONG (PAGAR PENGAMAN) ---
-    # Jika df_raw kosong, kita tampilkan peringatan dan STOP kode di sini agar tidak error ke bawah
-    if df_raw.empty:
+    if df_raw_base.empty:
         st.warning("⚠️ Data Penerimaan di Google Sheets masih kosong.")
-        st.info("Silakan masukkan data melalui menu Input Tagihan atau isi Google Sheets Anda.")
-        
-        # Tampilkan metrik nol agar dashboard tidak terlihat rusak
         m1, m2, m3, m4 = st.columns(4)
         m1.metric("Total Penerimaan", "0 Memo")
         m2.metric("Total Proses", "0 Memo")
-        m3.metric("Nilai Penerimaan", "Rp 0")
-        m4.metric("Nilai Proses", "Rp 0")
-        
-        st.stop() # BERHENTI DI SINI
+        st.stop()
 
-    # --- 3. PRE-PROCESSING WAKTU (Hanya jalan jika data ADA) ---
-    # Gunakan pengecekan kolom agar tidak error index
-    if len(df_raw.columns) > 0:
-        col_tgl_hist = df_raw.columns[0]
-        df_raw[col_tgl_hist] = pd.to_datetime(df_raw[col_tgl_hist], errors='coerce')
-    
-    col_tgl_proc = "Tanggal Dokumen Masuk Akuntansi"
-    if not df_proc.empty and col_tgl_proc in df_proc.columns:
-        df_proc[col_tgl_proc] = pd.to_datetime(df_proc[col_tgl_proc], errors='coerce')
+    # Bersihkan data dari None/NaN agar tampilan cantik
+    df_raw = df_raw_base.fillna("")
+    df_proc = df_proc_base.fillna("")
 
-    # --- 4. METRIK KPI UTAMA ---
+    # --- 3. METRIK KPI UTAMA ---
     st.markdown("### 📊 Ringkasan Performa Keseluruhan")
     m1, m2, m3, m4 = st.columns(4)
     
-    # Hitung Metrik dengan aman
     count_raw = len(df_raw)
-    count_proc = len(df_proc) if not df_proc.empty else 0
+    count_proc = len(df_proc)
     
     nom_hist = df_raw["NOMINAL TAGIHAN"].sum() if "NOMINAL TAGIHAN" in df_raw.columns else 0
-    nom_proc = df_proc["Nilai Tagihan"].sum() if (not df_proc.empty and "Nilai Tagihan" in df_proc.columns) else 0
+    nom_proc = df_proc["Nilai Tagihan"].sum() if "Nilai Tagihan" in df_proc.columns else 0
 
     with m1:
         st.metric("Total Penerimaan", f"{count_raw} Memo")
-    
     with m2:
         st.metric("Total Proses", f"{count_proc} Memo")
-    
     with m3:
         st.metric("Nilai Penerimaan", f"Rp {nom_hist:,.0f}".replace(",", "."))
-    
     with m4:
         st.metric("Nilai Proses", f"Rp {nom_proc:,.0f}".replace(",", "."))
 
     st.divider()
 
-    # --- 5. TABEL RINGKASAN TRANSAKSI TERAKHIR ---
+    # --- 4. TABEL RINGKASAN TRANSAKSI TERAKHIR ---
     st.markdown("### 🕒 Transaksi Terkini")
     tab_h, tab_p = st.tabs(["📌 5 Transaksi Terakhir (Penerimaan)", "📄 5 Transaksi Terakhir (Proses)"])
+
     with tab_h:
-        # 1. Pastikan data tidak kosong
+        # Filter data dummy jika ada
+        clean_h = df_raw[df_raw.iloc[:, 1] != "Belum Ada Data"].copy()
+        
         if not clean_h.empty:
-            # Gunakan .copy() agar tidak muncul peringatan SettingWithCopy
-            temp_df = clean_h.copy()
+            # Sorting berdasarkan kolom pertama (Waktu)
+            col_waktu = clean_h.columns[0]
+            clean_h['sort_key'] = pd.to_datetime(clean_h[col_waktu], errors='coerce')
             
-            # Ambil nama kolom pertama (biasanya Waktu/Timestamp)
-            col_waktu = temp_df.columns[0]
-            
-            # 2. Buat kolom pembantu untuk sorting (disembunyikan nanti)
-            temp_df['sort_key'] = pd.to_datetime(temp_df[col_waktu], errors='coerce')
-            
-            # 3. Urutkan terbaru di atas dan ambil 5 saja
-            latest_h = temp_df.sort_values(by='sort_key', ascending=False).head(5)
-            
-            # 4. Buang kolom pembantu sebelum ditampilkan
+            # Ambil 5 terbaru
+            latest_h = clean_h.sort_values(by='sort_key', ascending=False).head(5)
             latest_h = latest_h.drop(columns=['sort_key'])
 
-            st.dataframe(
-                latest_h, 
-                use_container_width=True, 
-                hide_index=True
-            )
+            st.dataframe(latest_h, use_container_width=True, hide_index=True)
         else:
             st.info("Belum ada transaksi penerimaan.")
 
+    with tab_p:
+        if not df_proc.empty:
+            clean_p = df_proc.copy()
+            # Gunakan kolom tanggal dokumen untuk sorting
+            col_tgl_proc = "Tanggal Dokumen Masuk Akuntansi"
+            if col_tgl_proc in clean_p.columns:
+                clean_p['sort_key'] = pd.to_datetime(clean_p[col_tgl_proc], errors='coerce')
+                latest_p = clean_p.sort_values(by='sort_key', ascending=False).head(5)
+                latest_p = latest_p.drop(columns=['sort_key'])
+            else:
+                latest_p = clean_p.tail(5)
+                
+            st.dataframe(latest_p, use_container_width=True, hide_index=True)
+        else:
+            st.info("Belum ada transaksi proses SAP.")
+
 except Exception as e:
-    # Error log yang lebih spesifik untuk memudahkan Mas Bram debug
     st.error(f"Terjadi kesalahan teknis pada Dashboard: {str(e)}")
 
 # --- FOOTER ---
