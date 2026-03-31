@@ -84,21 +84,22 @@ try:
     # --- 5. TABEL RINGKASAN TRANSAKSI TERAKHIR ---
     st.markdown("### 🕒 Transaksi Terkini")
     tab_h, tab_p = st.tabs(["📌 5 Transaksi Terakhir (Penerimaan)", "📄 5 Transaksi Terakhir (Proses)"])
-
     with tab_h:
-        # 1. Pastikan kolom Waktu terbaca sebagai tanggal untuk sorting
+        # 1. Pastikan data tidak kosong
         if not clean_h.empty:
-            col_waktu = clean_h.columns[0] 
-            
-            # Buat kolom sementara untuk sorting
-            # Gunakan .copy() agar tidak muncul SettingWithCopyWarning
+            # Gunakan .copy() agar tidak muncul peringatan SettingWithCopy
             temp_df = clean_h.copy()
+            
+            # Ambil nama kolom pertama (biasanya Waktu/Timestamp)
+            col_waktu = temp_df.columns[0]
+            
+            # 2. Buat kolom pembantu untuk sorting (disembunyikan nanti)
             temp_df['sort_key'] = pd.to_datetime(temp_df[col_waktu], errors='coerce')
             
-            # 2. Urutkan dan ambil 5 teratas
+            # 3. Urutkan terbaru di atas dan ambil 5 saja
             latest_h = temp_df.sort_values(by='sort_key', ascending=False).head(5)
             
-            # 3. Hapus kolom bantuan
+            # 4. Buang kolom pembantu sebelum ditampilkan
             latest_h = latest_h.drop(columns=['sort_key'])
 
             st.dataframe(
