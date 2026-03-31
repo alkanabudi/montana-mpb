@@ -2,6 +2,9 @@ import streamlit as st
 from datetime import datetime
 from utils import save_data_to_google
 
+# 1. Konfigurasi Layout (Ditaruh paling atas agar rapi)
+st.markdown("<style>.block-container {max-width: 95% !important; padding-top: 2rem;}</style>", unsafe_allow_html=True)
+
 # Judul Halaman
 st.title("➕ Input Tagihan MPB Baru")
 
@@ -38,12 +41,13 @@ with st.expander("ℹ️ INFO PENTING: Parameter & Kelengkapan Tagihan (Klik unt
             </tr>
         </table>
         <p style="font-size: 0.85em; margin-top: 10px; color: #555;">
-            *Pastikan semua parameter di atas sudah terpenuhi sebelum menekan tombol <b>SIMPAN</b>.
+            *Pastikan semua parameter di atas sudah terpenuhi sebelum menekan tombol <b>SUBMIT DATA</b>.
         </p>
     </div>
     """, unsafe_allow_html=True)
 
-st.write("") # Memberi jarak sedikit ke form bawah
+st.write("") 
+
 # --- FORM INPUT ---
 with st.form("form_input_mpb", clear_on_submit=True):
     col1, col2 = st.columns(2)
@@ -65,33 +69,31 @@ with st.form("form_input_mpb", clear_on_submit=True):
 
     if submitted:
         # Validasi sederhana
-        if asal_dept and no_memo and pic:
-            # Kolom A: Waktu (Standar Timestamp)
+        if asal_dept and no_memo and pic and nominal > 0:
+            # Kolom A: Waktu
             timestamp = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
             
-            # --- DATA HANYA SAMPAI KOLOM E ---
-            # Kita tidak mengirim kolom F dan G agar Dropdown di GSheets tetap utuh
-            data_baru = [
-                timestamp,          # Kolom A
-                asal_dept.upper(),  # Kolom B
-                no_memo,            # Kolom C
-                nominal,            # Kolom D
-                pic                 # Kolom E
-            ]
+            # --- DATA DISUSUN DALAM DICTIONARY (SINKRON DENGAN UTILS) ---
+            data_baru = {
+                "Waktu": timestamp,                    # Kolom A
+                "ASAL DEPARTEMEN": asal_dept.upper(),  # Kolom B
+                "No Memo": no_memo,                    # Kolom C
+                "NOMINAL TAGIHAN": nominal,            # Kolom D
+                "PIC": pic                             # Kolom E
+            }
             
-            # Eksekusi simpan ke baris terakhir
-            hasil = save_data_to_google(data_baru)  
+            # Eksekusi simpan
+            success, msg = save_data_to_google(data_baru)
             
-            if hasil:
-                st.success(f"✅ Data Memo **{no_memo}** berhasil tersimpan! ")
+            if success:
+                st.success(f"✅ Data Memo **{no_memo}** berhasil tersimpan!")
                 st.balloons()
+                # Hapus cache agar dashboard langsung update
+                st.cache_data.clear()
             else:
-                st.error("❌ Gagal menyimpan. Silakan cek koneksi internet atau permission spreadsheet.")
+                st.error(f"❌ Gagal menyimpan: {msg}")
         else:
-            st.warning("⚠️ Mohon lengkapi Departemen, Nomor Memo, dan PIC.")
-
-# --- CSS WIDE LAYOUT ---
-st.markdown("<style>.block-container {max-width: 95% !important; padding-top: 2rem;}</style>", unsafe_allow_html=True)
+            st.warning("⚠️ Mohon lengkapi semua kolom dan pastikan Nominal lebih dari 0.")
 
 # --- FOOTER SIDEBAR ---
 st.sidebar.markdown("---")
