@@ -81,7 +81,26 @@ def get_data_from_google():
     except Exception as e:
         st.error(f"Gagal urutkan data: {e}")
         return pd.DataFrame()
-
+        
+# --- 5. FUNGSI SIMPAN DATA KE GOOGLE SHEETS ---
+def save_data_to_google(data_dict):
+    try:
+        client = get_gspread_client()
+        if client is None:
+            return False, "Gagal koneksi ke Google Sheets."
+            
+        # Buka sheet tujuan (Pastikan namanya sama persis dengan di GDrive)
+        sheet = client.open("Daftar Penerimaan TAGIHAN MEMO PERINTAH BAYAR (Jawaban)").get_worksheet(0)
+        
+        # Susun data sesuai urutan kolom di GSheet Mas Bram
+        # Urutan ini harus sama dengan header di Google Sheets
+        row_to_add = list(data_dict.values())
+        
+        sheet.append_row(row_to_add)
+        return True, "Data berhasil disimpan!"
+    except Exception as e:
+        return False, f"Terjadi kesalahan: {str(e)}"
+    
 @st.cache_data(ttl=60)
 def get_data_mpb_2025():
     client = get_gspread_client()
@@ -98,6 +117,26 @@ def get_data_mpb_2025():
     except:
         return pd.DataFrame()
 
+# --- 5. FUNGSI SIMPAN DATA KE GOOGLE SHEETS ---
+def save_data_to_google(data_dict):
+    try:
+        client = get_gspread_client()
+        if client is None:
+            return False, "Gagal koneksi ke Google Sheets."
+            
+        # Buka sheet tujuan (Pastikan namanya sama persis dengan di GDrive)
+        sheet = client.open("Daftar Penerimaan TAGIHAN MEMO PERINTAH BAYAR (Jawaban)").get_worksheet(0)
+        
+        # Susun data sesuai urutan kolom di GSheet Mas Bram
+        # Urutan ini harus sama dengan header di Google Sheets
+        row_to_add = list(data_dict.values())
+        
+        sheet.append_row(row_to_add)
+        return True, "Data berhasil disimpan!"
+    except Exception as e:
+        return False, f"Terjadi kesalahan: {str(e)}"
+    
+# --- 5. FUNGSI AI MONTANA ---
 def get_montana_chat_response(user_query):
     try:
         api_key = st.secrets.get("gemini_api_key")
