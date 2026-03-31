@@ -87,43 +87,41 @@ def get_data_mpb_2025():
     except:
         return pd.DataFrame()
 
-# --- 4. CHATBOT MONTANA (GEMINI) ---
 def get_montana_chat_response(user_query):
     try:
         api_key = st.secrets.get("gemini_api_key")
-        if not api_key:
-            return "Kunci API Gemini tidak ditemukan."
-            
+        if not api_key: return "Kunci API tidak ditemukan."
         genai.configure(api_key=api_key)
+
+        # --- LANGKAH PENTING: Kasih nilai awal agar tidak error ---
+        text_knowledge = "Data SOP tidak tersedia sementara." 
         
-        # --- Bagian Inisialisasi Model yang Lebih Tangguh ---
+        file_id = "1jX-yVKyMmIuOOdx7Z-qpEtTYzn_RhNu1" 
+        url = f'https://drive.google.com/uc?id={file_id}&export=download'
+        
         try:
-            # Coba model terbaru dulu
-            model = genai.GenerativeModel('gemini-1.5-flash')
-            prompt = f"Anda Montana AI Petrokimia. Jawab ringkas dari data: {text_knowledge[:10000]}\n\nUser: {user_query}"
-            response = model.generate_content(prompt)
-        except:
-            # Jika 404, pindah ke model yang paling stabil di semua region
-            model = genai.GenerativeModel('gemini-pro')
-            prompt = f"Anda Montana AI Petrokimia. Jawab ringkas: {user_query}\n\nData: {text_knowledge[:8000]}"
-            response = model.generate_content(prompt)
+            resp = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=10)
+            if resp.status_code == 200:
+                pdf_file = BytesIO(resp.content)
+                reader = PdfReader(pdf_file)
+                extracted_text = ""
+                for page in reader.pages[:5]:
+                    extracted_text += page.extract_text() or ""
+                
+                # Jika berhasil ekstrak, baru timpa variabel text_knowledge
+                if extracted_text.strip():
+                    text_knowledge = extracted_text
+        except Exception:
+            # Jika Drive gagal diakses, Montana tetap punya jawaban default
+            pass
+
+        # Panggil Model (Gunakan yang paling standar)
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        
+        prompt = f"Anda Montana, AI Petrokimia. Jawab ringkas dari data ini: {text_knowledge[:10000]}\n\nUser: {user_query}"
+        response = model.generate_content(prompt)
         
         return response.text
 
-        # Ambil PDF Pengetahuan
-        file_id = "1jX-yVKyMmIuOOdx7Z-qpEtTYzn_RhNu1" 
-        url = f'https://drive.google.com/uc?id={file_id}&export=download'
-        resp = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=15)
-        
-        text_knowledge = ""
-        if resp.status_code == 200:
-            pdf_file = BytesIO(resp.content)
-            reader = PdfReader(pdf_file)
-            for page in reader.pages[:5]:
-                text_knowledge += page.extract_text() or ""
-        
-        prompt = f"Anda Montana AI Petrokimia. Jawab ringkas dari data: {text_knowledge[:10000]}\n\nUser: {user_query}"
-        response = model.generate_content(prompt)
-        return response.text
     except Exception as e:
         return f"Kendala teknis: {str(e)}"
