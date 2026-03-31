@@ -65,14 +65,23 @@ def get_data_from_google():
         sheet = client.open("Daftar Penerimaan TAGIHAN MEMO PERINTAH BAYAR (Jawaban)").get_worksheet(0)
         df = get_clean_df(sheet.get_all_values())
         
-        # --- LOGIKA PENGURUTAN WAKTU ---
+        # --- LOGIKA PENGURUTAN WAKTU YANG LEBIH AMAN ---
         if "Waktu" in df.columns:
-            # Ubah kolom Waktu ke format datetime agar bisa diurutkan dengan benar
-            df["Waktu"] = pd.to_datetime(df["Waktu"], errors='coerce')
-            # Urutkan berdasarkan Waktu secara descending (Terbaru di atas)
-            df = df.sort_values(by="Waktu", ascending=False)
-            # Kembalikan ke format teks biasa agar enak dilihat di tabel
-            df["Waktu"] = df["Waktu"].dt.strftime('%d/%m/%Y %H:%M:%S')
+            # Pastikan tidak ada spasi di kolom Waktu dan buang baris yang benar-benar kosong
+            df["Waktu"] = df["Waktu"].astype(str).str.strip()
+            
+            # Buat kolom bayangan untuk sorting agar tidak merusak tampilan asli
+            df['waktu_sort'] = pd.to_datetime(df["Waktu"], errors='coerce')
+            
+            # Urutkan berdasarkan kolom bayangan (Terbaru di atas)
+            df = df.sort_values(by="waktu_sort", ascending=False)
+            
+            # Hapus kolom bayangan agar tidak muncul di tabel Dashboard
+            df = df.drop(columns=['waktu_sort'])
+            
+            # Jika ada yang jadi 'NaT' atau 'None' setelah diproses, 
+            # kita kembalikan ke teks asli dari GSheet supaya tidak kosong
+            df["Waktu"] = df["Waktu"].replace(['None', 'nan', 'NaT'], '')
         
         if "NOMINAL TAGIHAN" in df.columns:
             df["NOMINAL TAGIHAN"] = to_numeric_clean(df["NOMINAL TAGIHAN"])
