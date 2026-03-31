@@ -96,8 +96,19 @@ def get_montana_chat_response(user_query):
             
         genai.configure(api_key=api_key)
         
-        # Nama model paling stabil
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        # --- Bagian Inisialisasi Model yang Lebih Tangguh ---
+        try:
+            # Coba model terbaru dulu
+            model = genai.GenerativeModel('gemini-1.5-flash')
+            prompt = f"Anda Montana AI Petrokimia. Jawab ringkas dari data: {text_knowledge[:10000]}\n\nUser: {user_query}"
+            response = model.generate_content(prompt)
+        except:
+            # Jika 404, pindah ke model yang paling stabil di semua region
+            model = genai.GenerativeModel('gemini-pro')
+            prompt = f"Anda Montana AI Petrokimia. Jawab ringkas: {user_query}\n\nData: {text_knowledge[:8000]}"
+            response = model.generate_content(prompt)
+        
+        return response.text
 
         # Ambil PDF Pengetahuan
         file_id = "1jX-yVKyMmIuOOdx7Z-qpEtTYzn_RhNu1" 
