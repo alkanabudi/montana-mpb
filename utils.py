@@ -4,7 +4,7 @@ import gspread
 import base64
 import json
 import requests
-from openai import OpenAI
+import google.generativeai as genai
 from io import BytesIO
 from pypdf import PdfReader
 from oauth2client.service_account import ServiceAccountCredentials
