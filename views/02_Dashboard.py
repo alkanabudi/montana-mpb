@@ -87,19 +87,20 @@ try:
 
     with tab_h:
         # 1. Pastikan kolom Waktu terbaca sebagai tanggal untuk sorting
-        # Kita asumsikan kolom pertama (index 0) adalah Waktu/Timestamp
-        col_waktu = clean_h.columns[0] 
-        
-        # Buat kolom sementara untuk sorting agar tidak merusak tampilan teks asli
-        clean_h['sort_key'] = pd.to_datetime(clean_h[col_waktu], errors='coerce')
-        
-        # 2. Urutkan berdasarkan sort_key (Terbaru di atas)
-        latest_h = clean_h.sort_values(by='sort_key', ascending=False).head(5)
-        
-        # 3. Hapus kolom bantuan sorting agar tidak tampil di tabel
-        latest_h = latest_h.drop(columns=['sort_key'])
+        if not clean_h.empty:
+            col_waktu = clean_h.columns[0] 
+            
+            # Buat kolom sementara untuk sorting
+            # Gunakan .copy() agar tidak muncul SettingWithCopyWarning
+            temp_df = clean_h.copy()
+            temp_df['sort_key'] = pd.to_datetime(temp_df[col_waktu], errors='coerce')
+            
+            # 2. Urutkan dan ambil 5 teratas
+            latest_h = temp_df.sort_values(by='sort_key', ascending=False).head(5)
+            
+            # 3. Hapus kolom bantuan
+            latest_h = latest_h.drop(columns=['sort_key'])
 
-        if not latest_h.empty:
             st.dataframe(
                 latest_h, 
                 use_container_width=True, 
