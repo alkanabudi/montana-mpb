@@ -26,6 +26,11 @@ try:
     df_raw = get_data_from_google()
     df_proc = get_data_mpb_2025()
 
+    df_raw = get_data_from_google()
+    if not df_raw.empty:
+    # Ganti 'None' atau NaN dengan string kosong agar tidak muncul tulisan None di tabel
+    df_raw = df_raw.fillna("")
+
     # --- 2. CEK DATA KOSONG (PAGAR PENGAMAN) ---
     # Jika df_raw kosong, kita tampilkan peringatan dan STOP kode di sini agar tidak error ke bawah
     if df_raw.empty:
@@ -80,12 +85,21 @@ try:
     st.markdown("### 🕒 Transaksi Terkini")
     tab_h, tab_p = st.tabs(["📌 5 Transaksi Terakhir (Penerimaan)", "📄 5 Transaksi Terakhir (Proses)"])
 
-    with tab_h:
-        # Tambahan filter agar baris dummy "Belum Ada Data" tidak muncul
-        clean_h = df_raw[df_raw.iloc[:, 1] != "Belum Ada Data"] if len(df_raw) > 0 else df_raw
+with tab_h:
+        # 1. Pastikan kolom Waktu terbaca sebagai tanggal untuk sorting
+        # Kita asumsikan kolom pertama (index 0) adalah Waktu/Timestamp
+        col_waktu = clean_h.columns[0] 
         
-        if not clean_h.empty:
-            latest_h = clean_h.tail(5).iloc[::-1]
+        # Buat kolom sementara untuk sorting agar tidak merusak tampilan teks asli
+        clean_h['sort_key'] = pd.to_datetime(clean_h[col_waktu], errors='coerce')
+        
+        # 2. Urutkan berdasarkan sort_key (Terbaru di atas)
+        latest_h = clean_h.sort_values(by='sort_key', ascending=False).head(5)
+        
+        # 3. Hapus kolom bantuan sorting agar tidak tampil di tabel
+        latest_h = latest_h.drop(columns=['sort_key'])
+
+        if not latest_h.empty:
             st.dataframe(
                 latest_h, 
                 use_container_width=True, 
@@ -93,17 +107,6 @@ try:
             )
         else:
             st.info("Belum ada transaksi penerimaan.")
-
-    with tab_p:
-        if not df_proc.empty:
-            latest_p = df_proc.tail(5).iloc[::-1]
-            st.dataframe(
-                latest_p, 
-                use_container_width=True, 
-                hide_index=True
-            )
-        else:
-            st.info("Belum ada transaksi proses SAP.")
 
 except Exception as e:
     # Error log yang lebih spesifik untuk memudahkan Mas Bram debug
