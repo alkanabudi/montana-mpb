@@ -4,16 +4,17 @@ import streamlit as st
 st.set_page_config(
     page_title="MONTANA System", 
     layout="centered", 
-    initial_sidebar_state="collapsed"
+    initial_sidebar_state="expanded" # Dipaksa terbuka agar user HP tidak bingung
 )
 
-# --- CSS GLOBAL: LOGIN & CHATBOT UI ---
+# --- CSS GLOBAL: LOGIN & UI ---
 image_url = "https://storage.googleapis.com/pkg-portal-bucket/images/PG_website1_Kantor-Pusat-Petrokimia-Gresik.jpeg"
 
 final_style = f"""
     <style>
     .stAppHeader {{ visibility: hidden; }}
     
+    /* BACKGROUND IMAGE */
     .stApp {{
         background-image: url("{image_url}");
         background-size: cover;
@@ -21,35 +22,47 @@ final_style = f"""
         background-attachment: fixed;
     }}
     
-    /* JUDUL UTAMA (MONTANA MPB) */
+    /* JUDUL UTAMA (MONTANA MPB) - NAVY BLUE KONTRAS */
     .main-title {{
         font-family: 'Segoe UI', Roboto, sans-serif;
-        font-size: 3.5rem !important;
+        font-size: 3.8rem !important;
         font-weight: 850 !important;
-        color: #FFFFFF !important;
+        color: #002D62 !important; /* Navy Blue Profesional */
         text-align: center;
         text-transform: uppercase;
         letter-spacing: 5px;
-        text-shadow: 3px 3px 10px rgba(0,0,0,0.8);
+        margin-bottom: 0px;
+        /* Shadow putih halus agar teks 'lepas' dari background langit */
+        text-shadow: 2px 2px 8px rgba(255, 255, 255, 0.8);
     }}
     
+    /* SUB-DESKRIPSI - NAVY BLUE */
+    .sub-title {{
+        color: #002D62 !important;
+        text-align: center;
+        font-weight: 700;
+        font-size: 1.2rem;
+        margin-top: -10px;
+        margin-bottom: 30px;
+        text-shadow: 1px 1px 5px rgba(255, 255, 255, 0.6);
+    }
+
     /* KOTAK LOGIN TRANSPARAN */
     [data-testid="stForm"] {{
-        background: rgba(15, 23, 42, 0.4) !important;
-        backdrop-filter: blur(15px) !important;
-        padding: 45px !important;
-        border-radius: 25px !important;
-        border: 1px solid rgba(255, 255, 255, 0.2) !important;
-        box-shadow: 0 20px 50px rgba(0,0,0,0.7) !important;
-        max-width: 500px !important;
+        background: rgba(255, 255, 255, 0.2) !important; /* Lebih terang agar kontras */
+        backdrop-filter: blur(20px) !important;
+        padding: 40px !important;
+        border-radius: 20px !important;
+        border: 1px solid rgba(255, 255, 255, 0.4) !important;
+        box-shadow: 0 15px 35px rgba(0,0,0,0.2) !important;
+        max-width: 450px !important;
         margin: auto !important;
     }}
 
-    /* STYLE KHUSUS EXPANDER CHATBOT AGAR TERLIHAT FLOATING */
-    .stExpander {{
-        border: 1px solid #0284c7 !important;
-        border-radius: 15px !important;
-        background-color: white !important;
+    /* INPUT TEXT LABEL */
+    [data-testid="stForm"] label {{
+        color: #002D62 !important;
+        font-weight: bold;
     }}
     </style>
 """
@@ -66,8 +79,10 @@ if "messages" not in st.session_state:
 if not st.session_state.logged_in:
     st.markdown(final_style, unsafe_allow_html=True)
     st.markdown("<br><br>", unsafe_allow_html=True)
+    
+    # Judul & Sub-judul dengan CSS Baru
     st.markdown('<p class="main-title">MONTANA MPB</p>', unsafe_allow_html=True)
-    st.markdown('<p style="color:white; text-align:center; font-weight:600;">Monitoring Analitik Tagihan Internal MPB</p>', unsafe_allow_html=True)
+    st.markdown('<p class="sub-title">Monitoring Analitik Tagihan Internal MPB</p>', unsafe_allow_html=True)
     
     col1, col2, col3 = st.columns([0.1, 1, 0.1])
     with col2:
@@ -77,27 +92,24 @@ if not st.session_state.logged_in:
             submitted = st.form_submit_button("MASUK SISTEM", use_container_width=True)
             
             if submitted:
+                # Login Admin
                 if user == "admin" and pwd == "admin123":
                     st.session_state.logged_in = True
                     st.session_state.role = "ADMIN"
                     st.rerun()
+                # Login Unit
                 elif user == "unit" and pwd == "unit123":
                     st.session_state.logged_in = True
                     st.session_state.role = "UNIT"
                     st.rerun()
                 else:
                     st.error("Kredensial salah!")
-    st.markdown("<p style='text-align: center; color: white; opacity: 0.8;'>developed by Alkana @ 2026<br>PT Petrokimia Gresik</p>", unsafe_allow_html=True)
+                    
+    st.markdown("<p style='text-align: center; color: #002D62; font-weight: bold;'>developed by Alkana @ 2026<br>PT Petrokimia Gresik</p>", unsafe_allow_html=True)
 
 # --- 2. HALAMAN SETELAH LOGIN ---
 else:
-    # Pengaturan Sidebar & Security per Role
-    if st.session_state.role == "UNIT":
-        st.markdown("<style>[data-testid='stSidebar'] {display: flex !important;} #MainMenu, header {visibility: hidden;}</style>", unsafe_allow_html=True)
-    else:
-        st.markdown("<style>[data-testid='stSidebar'] {display: flex !important;}</style>", unsafe_allow_html=True)
-
-    # Definisi Halaman (Routing)
+    # Sidebar Security & Navigation
     pg_dash  = st.Page("views/02_Dashboard.py", title="Dashboard", icon="🏠")
     pg_tren  = st.Page("views/03_Analisis_Tren.py", title="Analisis Tren", icon="📈")
     pg_input = st.Page("views/01_Input_Data.py", title="Input Data", icon="➕")
@@ -110,45 +122,43 @@ else:
             "Transaksi": [pg_input]
         }
     else:
-        menu = {"Layanan": [pg_input, pg_proc]}
+        # Menu untuk Unit (Hanya Input & Lihat Proses)
+        menu = {"Layanan Unit": [pg_input, pg_proc]}
 
     pg = st.navigation(menu, position="sidebar")
 
-    # Logout Button di Sidebar
+    # Sidebar Header & Logout
     with st.sidebar:
-        st.markdown(f"### 👤 {st.session_state.role}")
+        st.markdown(f"### 👤 Role: {st.session_state.role}")
         if st.button("🚪 Keluar Sistem", use_container_width=True):
             st.session_state.logged_in = False
             st.session_state.role = None
-            st.session_state.messages = [] # Reset chat saat logout
+            st.session_state.messages = []
             st.rerun()
         st.divider()
 
-    # JALANKAN HALAMAN UTAMA
+    # JALANKAN HALAMAN UTAMA (VIEWS)
     pg.run()
 
     # --- 3. WIDGET CHATBOT MONTANA AI (FLOATING) ---
-    # Widget ini ditaruh di bawah pg.run() agar selalu muncul di setiap halaman
-    st.markdown("---")
-    with st.expander("💬 Tanya Montana (AI Assistant)", expanded=False):
-        st.caption("Tanyakan tentang aturan, SOP, atau prosedur MPB")
-        
-        # Display chat history
-        for message in st.session_state.messages:
-            with st.chat_message(message["role"]):
-                st.markdown(message["content"])
+    with st.sidebar:
+        st.markdown("---")
+        with st.expander("💬 Tanya Montana (AI)", expanded=False):
+            st.caption("Asisten SOP MPB")
+            
+            # Chat Interface
+            for message in st.session_state.messages:
+                with st.chat_message(message["role"]):
+                    st.markdown(message["content"])
 
-        # Input Chat
-        if prompt := st.chat_input("Apa yang ingin Anda tanyakan?"):
-            # Tampilkan pesan user
-            with st.chat_message("user"):
-                st.markdown(prompt)
-            st.session_state.messages.append({"role": "user", "content": prompt})
+            if prompt := st.chat_input("Tanya prosedur..."):
+                with st.chat_message("user"):
+                    st.markdown(prompt)
+                st.session_state.messages.append({"role": "user", "content": prompt})
 
-            # Panggil fungsi AI dari utils
-            from utils import get_montana_chat_response
-            with st.chat_message("assistant"):
-                with st.spinner("Montana sedang membaca SOP..."):
-                    response = get_montana_chat_response(prompt)
-                    st.markdown(response)
-            st.session_state.messages.append({"role": "assistant", "content": response})
+                from utils import get_montana_chat_response
+                with st.chat_message("assistant"):
+                    with st.spinner("Membaca data..."):
+                        response = get_montana_chat_response(prompt)
+                        st.markdown(response)
+                st.session_state.messages.append({"role": "assistant", "content": response})
