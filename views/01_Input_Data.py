@@ -61,7 +61,7 @@ with st.form("form_input_mpb", clear_on_submit=True):
         pic = st.text_input("Nama PIC (Person In Charge) & EXT", placeholder="Nama dan nomor EXT")
 
     # Tombol Submit
-    submitted = st.form_submit_button("SIMPAN DATA", use_container_width=True, type="primary")
+    submitted = st.form_submit_button("SUBMIT DATA", use_container_width=True, type="primary")
 
     if submitted:
         # Validasi sederhana

@@ -133,17 +133,25 @@ def save_data_to_google(data_dict):
         if client is None:
             return False, "Gagal koneksi ke Google Sheets."
             
-        # Buka sheet tujuan (Pastikan namanya sama persis dengan di GDrive)
-        sheet = client.open("Daftar Penerimaan TAGIHAN MEMO PERINTAH BAYAR (Jawaban)").get_worksheet(0)
+        # Nama sheet harus sama persis
+        spreadsheet = client.open("Daftar Penerimaan TAGIHAN MEMO PERINTAH BAYAR (Jawaban)")
+        sheet = spreadsheet.get_worksheet(0)
         
-        # Susun data sesuai urutan kolom di GSheet Mas Bram
-        # Urutan ini harus sama dengan header di Google Sheets
+        # Ambil semua data untuk menghitung baris terakhir yang benar-benar ada isinya
+        existing_data = sheet.get_all_values()
+        next_row = len(existing_data) + 1
+        
+        # Susun data sesuai urutan kolom
         row_to_add = list(data_dict.values())
         
-        sheet.append_row(row_to_add)
-        return True, "Data berhasil disimpan!"
+        # Gunakan update() ke baris spesifik daripada append_row() 
+        # agar tidak 'melompat' ke baris ribuan
+        range_label = f"A{next_row}"
+        sheet.insert_row(row_to_add, next_row)
+        
+        return True, "Data berhasil tersimpan di baris terbaru!"
     except Exception as e:
-        return False, f"Terjadi kesalahan: {str(e)}"
+        return False, f"Gagal simpan: {str(e)}"
     
 # --- 5. FUNGSI AI MONTANA ---
 def get_montana_chat_response(user_query):
