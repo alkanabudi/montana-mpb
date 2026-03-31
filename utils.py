@@ -21,12 +21,11 @@ def get_gspread_client():
     except Exception:
         return None
 
-# --- 2. PEMBERSIH ANGKA ---
+# --- 2. PEMBERSIH DATA ---
 def to_numeric_clean(series):
     s = series.astype(str).str.replace('Rp', '', regex=False).str.replace('.', '', regex=False).str.replace(',', '', regex=False).str.strip()
     return pd.to_numeric(s, errors='coerce').fillna(0)
 
-# --- 3. FUNGSI PEMBERSIH KOLOM DUPLIKAT ---
 def fix_duplicate_columns(headers):
     clean_headers = []
     for i, h in enumerate(headers):
@@ -36,19 +35,35 @@ def fix_duplicate_columns(headers):
         clean_headers.append(new_h)
     return clean_headers
 
-# --- 4. AMBIL DATA DARI GOOGLE SHEETS ---
+# --- FUNGSI PEMBERSIH HEADER (Hanya Ambil yang Ada Namanya) ---
+def get_clean_df(list_of_lists):
+    if not list_of_lists or len(list_of_lists) <= 1:
+        return pd.DataFrame()
+        
+    raw_headers = list_of_lists[0]
+    # Hanya ambil indeks kolom yang judulnya TIDAK KOSONG
+    valid_col_indices = [i for i, h in enumerate(raw_headers) if h.strip() != ""]
+    
+    # Ambil nama header yang valid saja
+    clean_headers = [raw_headers[i].strip() for i in valid_col_indices]
+    
+    # Ambil data hanya untuk indeks kolom yang valid tadi
+    data_rows = []
+    for row in list_of_lists[1:]:
+        # Pastikan row memiliki jumlah kolom yang cukup, jika tidak beri string kosong
+        filtered_row = [row[i] if i < len(row) else "" for i in valid_col_indices]
+        data_rows.append(filtered_row)
+        
+    return pd.DataFrame(data_rows, columns=clean_headers)
+
+# --- UPDATE FUNGSI AMBIL DATA ---
 @st.cache_data(ttl=60)
 def get_data_from_google():
     client = get_gspread_client()
     if client is None: return pd.DataFrame()
     try:
         sheet = client.open("Daftar Penerimaan TAGIHAN MEMO PERINTAH BAYAR (Jawaban)").get_worksheet(0)
-        list_of_lists = sheet.get_all_values()
-        if len(list_of_lists) <= 1:
-            return pd.DataFrame()
-        
-        headers = fix_duplicate_columns(list_of_lists[0])
-        df = pd.DataFrame(list_of_lists[1:], columns=headers)
+        df = get_clean_df(sheet.get_all_values())
         
         if "NOMINAL TAGIHAN" in df.columns:
             df["NOMINAL TAGIHAN"] = to_numeric_clean(df["NOMINAL TAGIHAN"])
@@ -62,49 +77,29 @@ def get_data_mpb_2025():
     if client is None: return pd.DataFrame()
     try:
         sheet = client.open("Memo Perintah Bayar 2025").get_worksheet(0)
-        list_of_lists = sheet.get_all_values()
-        if not list_of_lists or len(list_of_lists) <= 1:
-            return pd.DataFrame()
-            
-        headers = fix_duplicate_columns(list_of_lists[0])
-        df = pd.DataFrame(list_of_lists[1:], columns=headers)
+        df = get_clean_df(sheet.get_all_values())
         
-        # Cari kolom nilai tagihan secara fleksibel
-        target = ""
-        if "Nilai Tagihan" in df.columns: target = "Nilai Tagihan"
-        elif "NOMINAL TAGIHAN" in df.columns: target = "NOMINAL TAGIHAN"
-        
-        if target:
-            df[target] = to_numeric_clean(df[target])
-            df["NOMINAL TAGIHAN"] = df[target]
-            
+        # Bersihkan nominal tanpa menambah kolom baru jika tidak perlu
+        for col in ["Nilai Tagihan", "NOMINAL TAGIHAN"]:
+            if col in df.columns:
+                df[col] = to_numeric_clean(df[col])
         return df
     except:
         return pd.DataFrame()
 
-def save_data_to_google(data_row):
-    client = get_gspread_client()
-    if client is None: return False
-    try:
-        sheet = client.open("Daftar Penerimaan TAGIHAN MEMO PERINTAH BAYAR (Jawaban)").get_worksheet(0)
-        sheet.append_row(data_row)
-        return True
-    except:
-        return False
-
-# --- 5. AI MONTANA ---
-import google.generativeai as genai
-
+# --- 4. CHATBOT MONTANA (GEMINI) ---
 def get_montana_chat_response(user_query):
     try:
-        # 1. Ambil API Key dari Secrets
         api_key = st.secrets.get("gemini_api_key")
         if not api_key:
-            return "Kunci 'gemini_api_key' tidak ditemukan di Secrets Streamlit."
+            return "Kunci API Gemini tidak ditemukan."
             
         genai.configure(api_key=api_key)
+        
+        # Nama model paling stabil
+        model = genai.GenerativeModel('gemini-1.5-flash')
 
-        # 2. Ambil Pengetahuan dari PDF SOP
+        # Ambil PDF Pengetahuan
         file_id = "1jX-yVKyMmIuOOdx7Z-qpEtTYzn_RhNu1" 
         url = f'https://drive.google.com/uc?id={file_id}&export=download'
         resp = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=15)
@@ -113,20 +108,11 @@ def get_montana_chat_response(user_query):
         if resp.status_code == 200:
             pdf_file = BytesIO(resp.content)
             reader = PdfReader(pdf_file)
-            for page in reader.pages[:10]: # Ambil 10 halaman awal
+            for page in reader.pages[:5]:
                 text_knowledge += page.extract_text() or ""
-
-         # --- 3. Inisialisasi Model (Paling Aman) ---
-    try:
-         # Gunakan nama paling dasar. Ini adalah 'Pintu Masuk' paling umum.
-        model = genai.GenerativeModel('gemini-1.5-flash')
-    
-            # Masukkan Prompt
-        full_prompt = f"Anda Montana, AI Petrokimia. Jawab ringkas dari SOP: {text_knowledge[:10000]}\n\nUser: {user_query}"
-    
-        response = model.generate_content(full_prompt)
+        
+        prompt = f"Anda Montana AI Petrokimia. Jawab ringkas dari data: {text_knowledge[:10000]}\n\nUser: {user_query}"
+        response = model.generate_content(prompt)
         return response.text
-
-        except Exception as e:
-        # Jika gagal, tampilkan error aslinya agar kita bisa diagnosa
-        return f"Kendala Teknis (Model): {str(e)}"
+    except Exception as e:
+        return f"Kendala teknis: {str(e)}"
