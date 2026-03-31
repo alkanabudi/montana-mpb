@@ -9,17 +9,17 @@ st.title("➕ Input Tagihan MPB Baru")
 with st.expander("ℹ️ INFO PENTING: Parameter & Kelengkapan Tagihan (Klik untuk Lihat)", expanded=False):
     st.markdown("""
     <div style="background-color: #f0f2f6; padding: 20px; border-radius: 10px; border-left: 5px solid #4da3ff;">
-        <h4 style="color: #1e1e1e; margin-top: 0;">⚠️ Perhatikan Sebelum Simpan & Analisis:</h4>
+        <h4 style="color: #1e1e1e; margin-top: 0;">⚠️ Perhatikan Sebelum Submit Tagihan MPB:</h4>
         <table style="width:100%; border-collapse: collapse; color: #1e1e1e;">
             <tr style="background-color: #4da3ff; color: white;">
                 <th style="padding: 10px; border: 1px solid #ddd;">Kategori</th>
-                <th style="padding: 10px; border: 1px solid #ddd;">Syarat / Batas</th>
+                <th style="padding: 10px; border: 1px solid #ddd;">Syarat</th>
                 <th style="padding: 10px; border: 1px solid #ddd;">Status</th>
             </tr>
             <tr>
                 <td style="padding: 8px; border: 1px solid #ddd;"><b>Nominal Tagihan</b></td>
                 <td style="padding: 8px; border: 1px solid #ddd;">Wajib sesuai Invoice & PO</td>
-                <td style="padding: 8px; border: 1px solid #ddd; color: green;">Kritis</td>
+                <td style="padding: 8px; border: 1px solid #ddd; color: green;">Wajib</td>
             </tr>
             <tr>
                 <td style="padding: 8px; border: 1px solid #ddd;"><b>Nomor Memo</b></td>
@@ -38,7 +38,7 @@ with st.expander("ℹ️ INFO PENTING: Parameter & Kelengkapan Tagihan (Klik unt
             </tr>
         </table>
         <p style="font-size: 0.85em; margin-top: 10px; color: #555;">
-            *Pastikan semua parameter di atas sudah terpenuhi sebelum menekan tombol <b>SIMPAN & ANALISIS</b>.
+            *Pastikan semua parameter di atas sudah terpenuhi sebelum menekan tombol <b>SIMPAN</b>.
         </p>
     </div>
     """, unsafe_allow_html=True)
