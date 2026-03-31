@@ -118,7 +118,7 @@ def get_montana_chat_response(user_query):
 
         # 3. Inisialisasi Model (Coba 1.5 Flash dulu, kalau gagal pakai Pro)
         try:
-            model = genai.GenerativeModel('models/gemini-1.5-flash-001')
+            model = genai.GenerativeModel('gemini-1.5-flash')
             prompt = f"Anda Montana, AI Petrokimia. Jawab dari SOP ini: {text_knowledge[:15000]}\n\nUser: {user_query}"
             response = model.generate_content(prompt)
         except:
