@@ -93,16 +93,18 @@ def save_data_to_google(data_row):
         return False
 
 # --- 5. AI MONTANA ---
+import google.generativeai as genai
+
 def get_montana_chat_response(user_query):
     try:
-        # Ambil Kunci dari Secrets
-        api_key = st.secrets.get("openai_api_key")
+        # 1. Ambil API Key dari Secrets
+        api_key = st.secrets.get("gemini_api_key")
         if not api_key:
-            return "Kunci API OpenAI tidak ditemukan di Secrets."
+            return "Kunci 'gemini_api_key' tidak ditemukan di Secrets Streamlit."
             
-        client = OpenAI(api_key=api_key)
+        genai.configure(api_key=api_key)
 
-        # Ambil Data PDF SOP
+        # 2. Ambil Pengetahuan dari PDF SOP
         file_id = "1jX-yVKyMmIuOOdx7Z-qpEtTYzn_RhNu1" 
         url = f'https://drive.google.com/uc?id={file_id}&export=download'
         resp = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=15)
@@ -111,17 +113,20 @@ def get_montana_chat_response(user_query):
         if resp.status_code == 200:
             pdf_file = BytesIO(resp.content)
             reader = PdfReader(pdf_file)
-            for page in reader.pages[:10]: # OpenAI sanggup baca lebih banyak
+            for page in reader.pages[:10]: # Ambil 10 halaman awal
                 text_knowledge += page.extract_text() or ""
 
-        # Chat dengan GPT-4o-mini (Cepat & Murah)
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": f"Anda adalah Montana, AI asisten PT Petrokimia Gresik. Jawablah berdasarkan SOP ini: {text_knowledge[:15000]}"},
-                {"role": "user", "content": user_query}
-            ]
-        )
-        return response.choices[0].message.content
+        # 3. Inisialisasi Model (Coba 1.5 Flash dulu, kalau gagal pakai Pro)
+        try:
+            model = genai.GenerativeModel('gemini-1.5-flash')
+            prompt = f"Anda Montana, AI Petrokimia. Jawab dari SOP ini: {text_knowledge[:15000]}\n\nUser: {user_query}"
+            response = model.generate_content(prompt)
+        except:
+            model = genai.GenerativeModel('gemini-pro')
+            prompt = f"Jawab ringkas: {user_query}\n\nData: {text_knowledge[:8000]}"
+            response = model.generate_content(prompt)
+        
+        return response.text
+
     except Exception as e:
-        return f"Kendala OpenAI: {str(e)}"
+        return f"Kendala Gemini: {str(e)}"
