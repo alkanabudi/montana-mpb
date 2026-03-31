@@ -116,15 +116,17 @@ def get_montana_chat_response(user_query):
             for page in reader.pages[:10]: # Ambil 10 halaman awal
                 text_knowledge += page.extract_text() or ""
 
-       # --- 3. Inisialisasi Model (Gunakan Nama Paling Standar) ---
-        try:
-    # Ini adalah nama model paling standar (tanpa 'models/' dan tanpa '-latest')
-    model = genai.GenerativeModel('gemini-1.5-flash') 
+         # --- 3. Inisialisasi Model (Paling Aman) ---
+    try:
+         # Gunakan nama paling dasar. Ini adalah 'Pintu Masuk' paling umum.
+        model = genai.GenerativeModel('gemini-1.5-flash')
     
-    prompt = f"Anda Montana, AI Petrokimia. Jawab dari SOP ini: {text_knowledge[:15000]}\n\nUser: {user_query}"
-    response = model.generate_content(prompt)
-        except Exception as e:
-    # Jika gagal, tampilkan pesan error yang jujur agar kita tahu masalahnya
-    return f"Kendala Teknis (Model): {str(e)}"
+            # Masukkan Prompt
+        full_prompt = f"Anda Montana, AI Petrokimia. Jawab ringkas dari SOP: {text_knowledge[:10000]}\n\nUser: {user_query}"
+    
+        response = model.generate_content(full_prompt)
+        return response.text
 
-    return response.text
+        except Exception as e:
+        # Jika gagal, tampilkan error aslinya agar kita bisa diagnosa
+        return f"Kendala Teknis (Model): {str(e)}"
