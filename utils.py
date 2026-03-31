@@ -4,7 +4,7 @@ import gspread
 import base64
 import json
 import requests
-import google.generativeai as genai
+from openai import OpenAI
 from io import BytesIO
 from pypdf import PdfReader
 from oauth2client.service_account import ServiceAccountCredentials
@@ -95,17 +95,14 @@ def save_data_to_google(data_row):
 # --- 5. AI MONTANA ---
 def get_montana_chat_response(user_query):
     try:
-        # 1. Pastikan API Key Terpasang
-        api_key = st.secrets.get("gemini_api_key") or "AIzaSyCIEE6rFaDA2ftqJ1tbxi3G-qsfWfmzQgE"
+        # Ambil Kunci dari Secrets
+        api_key = st.secrets.get("openai_api_key")
         if not api_key:
-            return "Kunci API tidak ditemukan di Secrets."
+            return "Kunci API OpenAI tidak ditemukan di Secrets."
             
-        genai.configure(api_key=api_key)
+        client = OpenAI(api_key=api_key)
 
-        # 2. Inisialisasi Model (Gunakan Nama Standar)
-        model = genai.GenerativeModel('gemini-1.5-flash')
-
-        # 3. Ambil PDF (Logika GDrive Mas Bram)
+        # Ambil Data PDF SOP
         file_id = "1jX-yVKyMmIuOOdx7Z-qpEtTYzn_RhNu1" 
         url = f'https://drive.google.com/uc?id={file_id}&export=download'
         resp = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=15)
@@ -114,21 +111,17 @@ def get_montana_chat_response(user_query):
         if resp.status_code == 200:
             pdf_file = BytesIO(resp.content)
             reader = PdfReader(pdf_file)
-            for page in reader.pages:
+            for page in reader.pages[:10]: # OpenAI sanggup baca lebih banyak
                 text_knowledge += page.extract_text() or ""
-        
-        # 4. Generate Jawaban
-        prompt = f"Anda Montana, AI Petrokimia. Jawab ringkas dari data ini: {text_knowledge[:15000]}\n\nUser: {user_query}"
-        
-        ai_resp = model.generate_content(prompt)
-        
-        if ai_resp and ai_resp.text:
-            return ai_resp.text
-        else:
-            return "Montana sedang berpikir keras tapi belum menemukan jawaban."
 
+        # Chat dengan GPT-4o-mini (Cepat & Murah)
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": f"Anda adalah Montana, AI asisten PT Petrokimia Gresik. Jawablah berdasarkan SOP ini: {text_knowledge[:15000]}"},
+                {"role": "user", "content": user_query}
+            ]
+        )
+        return response.choices[0].message.content
     except Exception as e:
-        # Jika masih error 404, coba model alternatif otomatis
-        if "404" in str(e):
-            return "Maaf, server Google sedang sinkronisasi model. Mohon coba lagi dalam 1 menit."
-        return f"Ada kendala teknis: {str(e)}"
+        return f"Kendala OpenAI: {str(e)}"
