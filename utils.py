@@ -162,3 +162,18 @@ def get_montana_chat_response(user_query):
         return response.text
     except Exception as e:
         return f"Kendala teknis: {str(e)}"
+    
+# --- TAMBAHKAN KONFIGURASI PATH ---
+        # Ini agar sistem bisa menemukan wkhtmltopdf baik di Lokal maupun di Cloud
+        path_wkhtmltopdf = '/usr/bin/wkhtmltopdf' # Path standar di Linux/Streamlit Cloud
+        config = pdfkit.configuration(wkhtmltopdf=path_wkhtmltopdf) if os.path.exists(path_wkhtmltopdf) else pdfkit.configuration()
+
+        options = {
+            'page-size': 'A4',
+            'encoding': "UTF-8",
+            'no-outline': None,
+            'quiet': ''
+        }
+        
+        # Eksekusi cetak dengan menyertakan konfigurasi
+        pdf_out = pdfkit.from_string(html_out, False, options=options, configuration=config)
