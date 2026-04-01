@@ -6,7 +6,7 @@ import json
 import requests
 import os
 import io
-import pdfkit
+from weasyprint import HTML
 import google.generativeai as genai
 from io import BytesIO
 from pypdf import PdfReader
@@ -108,6 +108,7 @@ def generate_rekomendasi_mpb(df_dept):
         rekomendasi.append("<b>Normal:</b> Tren penerimaan stabil dan sesuai dengan kapasitas pemrosesan.")
     return "".join([f"<li>{r}</li>" for r in rekomendasi])
 
+#---6. LOGIKA CETAK PDF
 def create_pdf_report_mpb(df_for_report, selected_dept, periode_str):
     try:
         tgl_cetak = datetime.now().strftime("%d/%m/%Y %H:%M")
@@ -121,7 +122,7 @@ def create_pdf_report_mpb(df_for_report, selected_dept, periode_str):
             data_rows["NOMINAL TAGIHAN"] = data_rows["NOMINAL TAGIHAN"].apply(lambda x: f"{x:,.0f}".replace(",", "."))
         data_rows_list = data_rows.to_dict('records')
 
-        # Setup Jinja2 (Cari file template di folder views)
+        # Setup Jinja2
         template_dir = os.path.join(os.getcwd(), 'views')
         env = Environment(loader=FileSystemLoader(template_dir))
         template = env.get_template('report_template.html')
@@ -133,8 +134,9 @@ def create_pdf_report_mpb(df_for_report, selected_dept, periode_str):
             rekomendasi_html=rekomendasi_html
         )
 
-        options = {'page-size': 'A4', 'encoding': "UTF-8", 'no-outline': None, 'quiet': ''}
-        pdf_out = pdfkit.from_string(html_out, False, options=options)
+        # --- GANTI BAGIAN INI (DARI PDFKIT KE WEASYPRINT) ---
+        pdf_out = HTML(string=html_out).write_pdf()
+        
         return pdf_out, None
     except Exception as e:
         return None, str(e)

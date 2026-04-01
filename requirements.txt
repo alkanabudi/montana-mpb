@@ -6,5 +6,6 @@ google-generativeai
 pypdf
 requests
 plotly
-pdfkit
 jinja2
+xlsxwriter
+weasyprint
