@@ -1,21 +1,23 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-from utils import get_data_from_google, get_data_mpb_2025
+from datetime import datetime
+from utils import get_data_from_google, get_data_mpb_2025, create_pdf_report_mpb
 
-# Wide Layout
+# 1. Konfigurasi Layout (Wide)
 st.markdown("<style>.block-container {max-width: 95% !important; padding-top: 2rem;}</style>", unsafe_allow_html=True)
 
 st.title("📈 Analisis Performa & Komparasi MPB")
 
 try:
+    # --- 1. AMBIL DATA ---
     df_raw = get_data_from_google()
     df_proc = get_data_mpb_2025()
 
-    with st.expander("🛠 Debug Data"):
+    with st.expander("🛠 Debug Data Sistem"):
         st.write(f"Baris Penerimaan: {len(df_raw)} | Baris Proses: {len(df_proc)}")
 
-    # --- KONVERSI TANGGAL ---
+    # --- 2. KONVERSI TANGGAL ---
     col_tgl_hist = df_raw.columns[0]
     df_raw[col_tgl_hist] = pd.to_datetime(df_raw[col_tgl_hist], errors='coerce')
     
@@ -34,7 +36,7 @@ try:
         df_proc['Tahun'] = df_proc[col_tgl_proc].dt.year.astype(int)
         df_proc['Bulan'] = df_proc[col_tgl_proc].dt.month_name()
 
-    # --- SIDEBAR FILTERS ---
+    # --- 3. SIDEBAR FILTERS ---
     st.sidebar.header("🔍 Filter Analisis")
     all_years = sorted(list(set(df_raw['Tahun'].unique()) | (set(df_proc['Tahun'].unique()) if not df_proc.empty else set())), reverse=True)
     sel_year = st.sidebar.selectbox("Pilih Tahun", all_years if all_years else [2026])
@@ -52,7 +54,7 @@ try:
         if not df_p_f.empty:
             df_p_f = df_p_f[df_p_f['Bulan'].isin(sel_months)]
 
-    # --- TAMPILAN TAB ---
+    # --- 4. TAMPILAN TAB GRAFIK ---
     t1, t2, t3, t4 = st.tabs(["📅 Tren Waktu", "🏢 Distribusi Unit", "💰 Analisis Nominal", "📊 Komparasi Qty"])
 
     with t1:
@@ -88,7 +90,6 @@ try:
     with t4:
         st.subheader(f"Bar Chart Komparatif Harian (Tahun {sel_year})")
         if not df_h_f.empty:
-            # Perbaikan di sini: Menyamakan nama kolom setelah agregasi agar concat aman
             res_h = df_h_f.groupby(df_h_f[col_tgl_hist].dt.date).size().reset_index(name='Qty')
             res_h.columns = ['Tanggal', 'Qty']
             res_h['Tipe'] = 'Masuk'
@@ -100,17 +101,49 @@ try:
                 res_p['Tipe'] = 'Proses'
             
             df_c = pd.concat([res_h, res_p])
-            
             fig_bar = px.bar(df_c, x='Tanggal', y='Qty', color='Tipe', barmode='group', text_auto=True,
                              color_discrete_map={'Masuk': '#3B82F6', 'Proses': '#10B981'})
             st.plotly_chart(fig_bar, use_container_width=True)
-            
-            m1, m2 = st.columns(2)
-            m1.metric("Total Penerimaan", f"{len(df_h_f)} Memo")
-            m2.metric("Total Proses SAP", f"{len(df_p_f)} Memo")
+
+    st.divider()
+
+    # --- 5. FITUR CETAK LAPORAN PDF PRO (ATM STYLE) ---
+    st.markdown("### 🖨️ Cetak Laporan PDF Profesional")
+    st.info("Download rekapitulasi PDF dengan analisis rekomendasi otomatis berbasis filter di atas.")
+    
+    with st.expander("⚙️ Pengaturan Cetak Laporan", expanded=True):
+        c1, c2 = st.columns(2)
+        with c1:
+            list_dept_f = sorted(df_h_f['ASAL DEPARTEMEN'].unique())
+            sel_dept_pdf = st.selectbox("Pilih Departemen untuk Laporan", list_dept_f)
+        with c2:
+            period_val = f"{', '.join(sel_months) if sel_months else 'Tahunan'} {sel_year}"
+            period_str = st.text_input("Periode Laporan", value=period_val)
+
+        # Filter data untuk dikirim ke PDF generator
+        df_pdf_data = df_h_f[df_h_f['ASAL DEPARTEMEN'] == sel_dept_pdf].copy()
+
+        if st.button("📥 Generate & Download PDF Report", use_container_width=True, type="primary"):
+            if not df_pdf_data.empty:
+                with st.spinner(f"Menganalisis data {sel_dept_pdf}..."):
+                    pdf_bytes, err = create_pdf_report_mpb(df_pdf_data, sel_dept_pdf, period_str)
+                    
+                    if err:
+                        st.error(f"Gagal Cetak: {err}")
+                    else:
+                        st.success("✅ Laporan PDF siap diunduh!")
+                        st.download_button(
+                            label="💾 Download File PDF",
+                            data=pdf_bytes,
+                            file_name=f"Montana_Report_{sel_dept_pdf.replace(' ', '_')}.pdf",
+                            mime="application/pdf",
+                            use_container_width=True
+                        )
+            else:
+                st.warning("Data untuk departemen terpilih kosong pada filter ini.")
 
 except Exception as e:
-    st.error(f"Error: {e}")
+    st.error(f"Kesalahan Sistem: {e}")
 
 # --- FOOTER ---
 st.sidebar.markdown("---")

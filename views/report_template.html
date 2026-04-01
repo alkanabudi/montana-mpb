@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <title>Laporan Montana MPB</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #333; line-height: 1.4; }
+        .container { width: 100%; margin: 0 auto; padding: 20px; }
+        
+        /* HEADER - ATM GAMBAR 6 */
+        .header { text-align: center; border-bottom: 3px solid #002D62; padding-bottom: 10px; margin-bottom: 20px; }
+        .header h1 { color: #002D62; margin: 0; font-size: 24px; text-transform: uppercase; }
+        .header p { margin: 5px 0 0 0; font-size: 14px; color: #555; }
+
+        /* INFO BOX & STATUS - ATM GAMBAR 6 */
+        .info-status-container { display: flex; justify-content: space-between; margin-bottom: 25px; }
+        .info-box { width: 60%; background-color: #f9f9f9; border: 1px solid #ddd; border-radius: 8px; padding: 15px; }
+        .info-box table { width: 100%; border-collapse: collapse; }
+        .info-box td { padding: 4px; font-size: 13px; }
+        .info-box td.label { font-weight: bold; width: 35%; color: #555; }
+
+        .status-box { width: 30%; border: 3px solid #ddd; border-radius: 8px; text-align: center; padding: 10px; }
+        .status-box .status-title { font-size: 12px; font-weight: bold; color: #777; margin-bottom: 5px; }
+        .status-box .status-value { font-size: 20px; font-weight: bold; text-transform: uppercase; }
+        
+        /* WARNA STATUS MODIFIKASI UNTUK MPB */
+        .status-selesai { border-color: #28a745; color: #28a745; } /* Hijau */
+        .status-proses { border-color: #ffc107; color: #856404; }   /* Kuning Emas */
+        .status-tolak { border-color: #dc3545; color: #dc3545; }    /* Merah */
+
+        /* SECTION TITLE */
+        h3.section-title { color: #002D62; border-bottom: 2px solid #ddd; padding-bottom: 5px; margin-top: 25px; font-size: 16px; }
+
+        /* TABEL DATA - ATM GAMBAR 7 */
+        table.data-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12px; }
+        table.data-table th, table.data-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        table.data-table th { background-color: #002D62; color: white; font-weight: bold; text-align: center; }
+        table.data-table tr:nth-child(even) { background-color: #f2f2f2; }
+
+        /* REKOMENDASI BOX - ATM GAMBAR 7 */
+        .rekomendasi-box { background-color: #e8f0fe; border: 1px solid #002D62; border-radius: 8px; padding: 15px; margin-top: 10px; }
+        .rekomendasi-box p { margin: 0 0 10px 0; font-size: 13px; }
+        .rekomendasi-box ul { margin: 0; padding-left: 20px; font-size: 13px; }
+
+        /* FOOTER - ATM GAMBAR 7 */
+        .footer { text-align: right; font-size: 11px; color: #777; margin-top: 40px; border-top: 1px solid #ddd; padding-top: 5px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>MONTANA - REPORT TAGIHAN MPB BULANAN</h1>
+            <p>Rekapitulasi dan Analisis Performa Penerimaan Tagihan Internal MPB</p>
+        </div>
+
+        <div class="info-status-container">
+            <div class="info-box">
+                <table>
+                    <tr><td class="label">Asal Departemen</td><td>: {{ departemen }}</td></tr>
+                    <tr><td class="label">Periode Laporan</td><td>: {{ periode }}</td></tr>
+                    <tr><td class="label">Total Memo Diterima</td><td>: {{ total_memo }} Memo</td></tr>
+                    <tr><td class="label">Total Nominal Diterima</td><td>: {{ total_nominal }}</td></tr>
+                    <tr><td class="label">Tanggal Cetak</td><td>: {{ tgl_cetak }}</td></tr>
+                </table>
+            </div>
+            
+            <div class="status-box status-{{ status_class }}">
+                <div class="status-title">STATUS PERFORMA DEP:</div>
+                <div class="status-value">{{ status_performa }}</div>
+            </div>
+        </div>
+
+        <h3 class="section-title">IV. TABEL ACUAN SOP KELENGKAPAN (KONTROL KUALITAS INPUT)</h3>
+        <table class="data-table">
+            <tr>
+                <th>Kategori Parameter</th>
+                <th>Syarat Wajib SOP</th>
+                <th>Status Deviasi</th>
+            </tr>
+            <tr>
+                <td><b>Nominal & Memo</b></td>
+                <td>Wajib sesuai Invoice & Format: XXX/B/KU...</td>
+                <td style="color: green;">Normal (0 Deviasi)</td>
+            </tr>
+            <tr>
+                <td><b>Tanda Tangan & PIC</b></td>
+                <td>Wajib ada TTD basah/digital & No EXT</td>
+                <td style="color: green;">Normal (0 Deviasi)</td>
+            </tr>
+             <tr>
+                <td><b>Lampiran PDF</b></td>
+                <td>Maksimal 10MB (Jelas/Scan)</td>
+                <td style="color: orange;">Waspada ({{ lampiran_deviasi }} Deviasi)</td>
+            </tr>
+        </table>
+
+        <h3 class="section-title">III. HASIL ANALISIS & REKOMENDASI PERFORMA</h3>
+        <div class="rekomendasi-box">
+            <p>Berdasarkan tren data penerimaan bulan ini:</p>
+            <ul>
+                {{ rekomendasi_html | safe }}
+            </ul>
+        </div>
+
+        <h3 class="section-title">V. TABEL RIWAYAT PENERIMAAN MPB LENGKAP (PERIODE INI)</h3>
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Tgl Terima</th>
+                    <th>No Memo</th>
+                    <th>Asal Dept</th>
+                    <th>Nominal</th>
+                    <th>PIC</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in data_rows %}
+                <tr>
+                    <td>{{ row['Waktu'] }}</td>
+                    <td>{{ row['No Memo'] }}</td>
+                    <td>{{ row['ASAL DEPARTEMEN'] }}</td>
+                    <td style="text-align: right;">{{ row['NOMINAL TAGIHAN'] }}</td>
+                    <td>{{ row['PIC'] }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <div class="footer">
+            Dokumen Digital Montana v1.0<br>
+            developed by Alkana @ 2026<br>
+            <b>PT Petrokimia Gresik</b>
+        </div>
+    </div>
+</body>
+</html>
