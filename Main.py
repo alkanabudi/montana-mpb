@@ -105,7 +105,12 @@ if not st.session_state.logged_in:
                 else:
                     st.error("Kredensial salah!")
                     
-    st.markdown("<p style='text-align: center; color: #002D62; font-weight: bold;'>developed by Alkana @ 2026<br>PT Petrokimia Gresik</p>", unsafe_allow_html=True)
+    st.markdown("""
+        <p style='text-align: center; color: white; font-weight: bold; opacity: 0.9; text-shadow: 1px 1px 3px rgba(0,0,0,0.5);'>
+            developed by AlkaNa Budi @ 2026<br>
+            PT Petrokimia Gresik
+        </p>
+    """, unsafe_allow_html=True)
 
 # --- 2. HALAMAN SETELAH LOGIN ---
 else:
