@@ -108,7 +108,7 @@ try:
     st.divider()
 
     # --- 5. FITUR CETAK LAPORAN PDF (REVISI PERIODE DARI DROPLIST TAHUN) ---
-    st.markdown("### 🖨️ Cetak Laporan PDF Profesional")
+    st.markdown("### 🖨️ Cetak Laporan PDF")
     
     with st.expander("⚙️ Pengaturan Cetak Laporan", expanded=True):
         col_pdf1, col_pdf2 = st.columns(2)
