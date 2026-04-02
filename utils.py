@@ -133,7 +133,39 @@ def create_pdf_report_mpb(df_for_report, selected_dept, periode_str):
             lampiran_deviasi=0, status_performa="NORMAL", status_class="selesai",
             rekomendasi_html=rekomendasi_html
         )
+        # LOGIKA BARU: Hitung deviasi berdasarkan Kolom 6 (VERIFIKASI)
+        # Kita asumsikan kolomnya bernama 'VERIFIKASI' sesuai gambar tabel Mas Bram
+        verifikasi_deviasi = 0
+        if 'VERIFIKASI' in df_for_report.columns:
+            # Hitung berapa banyak yang statusnya 'REVISI'
+            verifikasi_deviasi = len(df_for_report[df_for_report['VERIFIKASI'].str.contains('REVISI', na=False, case=False)])
+        
+        # Tentukan Status Performa Berdasarkan Deviasi Verifikasi
+        if verifikasi_deviasi > 0:
+            status_performa = "WASPADA"
+            status_class = "proses" # Warna Kuning/Oranye
+        else:
+            status_performa = "NORMAL"
+            status_class = "selesai" # Warna Hijau
+            
+        # Jika deviasi sangat banyak (misal > 5), bisa diset KRITIS
+        if verifikasi_deviasi > 5:
+            status_performa = "KRITIS"
+            status_class = "tolak" # Warna Merah
 
+        # Kirim variabel 'verifikasi_deviasi' ke template HTML
+        html_out = template.render(
+            departemen=selected_dept,
+            periode=periode_str,
+            total_memo=len(df_for_report),
+            total_nominal=total_nominal_str,
+            tgl_cetak=datetime.now().strftime("%d/%m/%Y %H:%M"),
+            verifikasi_deviasi=verifikasi_deviasi, # Variabel baru
+            status_performa=status_performa,
+            status_class=status_class,
+            rekomendasi_html=generate_rekomendasi_mpb(df_for_report),
+            data_rows=data_rows_list
+        )
         # --- GANTI BAGIAN INI (DARI PDFKIT KE WEASYPRINT) ---
         pdf_out = HTML(string=html_out).write_pdf()
         
