@@ -92,7 +92,7 @@ def save_data_to_google(data_dict):
     except Exception as e:
         return False, f"Gagal simpan: {str(e)}"
 
-# --- 5. LOGIKA ANALISIS & CETAK PDF (PROFESSIONAL REPORT) ---
+# --- 5. LOGIKA REKOMENDASI OTOMATIS ---
 def generate_rekomendasi_mpb(df_dept):
     rekomendasi = []
     if df_dept.empty: return "<li>Belum ada data untuk dianalisis.</li>"
@@ -108,7 +108,7 @@ def generate_rekomendasi_mpb(df_dept):
         rekomendasi.append("<b>Normal:</b> Tren penerimaan stabil dan sesuai dengan kapasitas pemrosesan.")
     return "".join([f"<li>{r}</li>" for r in rekomendasi])
 
-#---6. LOGIKA CETAK PDF
+# --- 6. LOGIKA CETAK PDF (WEASYPRINT) ---
 def create_pdf_report_mpb(df_for_report, selected_dept, periode_str):
     try:
         tgl_cetak = datetime.now().strftime("%d/%m/%Y %H:%M")
@@ -116,64 +116,59 @@ def create_pdf_report_mpb(df_for_report, selected_dept, periode_str):
         nom_total = df_for_report["NOMINAL TAGIHAN"].sum() if "NOMINAL TAGIHAN" in df_for_report.columns else 0
         total_nominal_str = f"Rp {nom_total:,.0f}".replace(",", ".")
         
-        rekomendasi_html = generate_rekomendasi_mpb(df_for_report)
+        # HITUNG DEVIASI (BERDASARKAN STATUS REVISI)
+        verifikasi_deviasi = 0
+        if 'VERIFIKASI' in df_for_report.columns:
+            # Hitung jumlah baris yang statusnya 'REVISI' (case insensitive)
+            verifikasi_deviasi = len(df_for_report[df_for_report['VERIFIKASI'].astype(str).str.upper() == 'REVISI'])
+        
+        # Tentukan Status Performa
+        if verifikasi_deviasi > 0:
+            status_performa = "WASPADA"
+            status_class = "proses" # CSS: Oranye
+        else:
+            status_performa = "NORMAL"
+            status_class = "selesai" # CSS: Hijau
+            
+        if verifikasi_deviasi > 5:
+            status_performa = "KRITIS"
+            status_class = "tolak" # CSS: Merah
+
+        # Siapkan Riwayat Data
         data_rows = df_for_report.copy()
         if "NOMINAL TAGIHAN" in data_rows.columns:
             data_rows["NOMINAL TAGIHAN"] = data_rows["NOMINAL TAGIHAN"].apply(lambda x: f"{x:,.0f}".replace(",", "."))
         data_rows_list = data_rows.to_dict('records')
 
-        # Setup Jinja2
+        rekomendasi_html = generate_rekomendasi_mpb(df_for_report)
+
+        # Setup Jinja2 (Target folder views)
         template_dir = os.path.join(os.getcwd(), 'views')
         env = Environment(loader=FileSystemLoader(template_dir))
         template = env.get_template('report_template.html')
 
+        # Render HTML
         html_out = template.render(
-            departemen=selected_dept, periode=periode_str, total_memo=total_memo,
-            total_nominal=total_nominal_str, tgl_cetak=tgl_cetak, data_rows=data_rows_list,
-            lampiran_deviasi=0, status_performa="NORMAL", status_class="selesai",
+            departemen=selected_dept, 
+            periode=periode_str, 
+            total_memo=total_memo,
+            total_nominal=total_nominal_str, 
+            tgl_cetak=tgl_cetak, 
+            data_rows=data_rows_list,
+            verifikasi_deviasi=verifikasi_deviasi,
+            status_performa=status_performa, 
+            status_class=status_class,
             rekomendasi_html=rekomendasi_html
         )
-        # LOGIKA BARU: Hitung deviasi berdasarkan Kolom 6 (VERIFIKASI)
-        # Kita asumsikan kolomnya bernama 'VERIFIKASI' sesuai gambar tabel Mas Bram
-        verifikasi_deviasi = 0
-        if 'VERIFIKASI' in df_for_report.columns:
-            # Hitung berapa banyak yang statusnya 'REVISI'
-            verifikasi_deviasi = len(df_for_report[df_for_report['VERIFIKASI'].str.contains('REVISI', na=False, case=False)])
-        
-        # Tentukan Status Performa Berdasarkan Deviasi Verifikasi
-        if verifikasi_deviasi > 0:
-            status_performa = "WASPADA"
-            status_class = "proses" # Warna Kuning/Oranye
-        else:
-            status_performa = "NORMAL"
-            status_class = "selesai" # Warna Hijau
-            
-        # Jika deviasi sangat banyak (misal > 5), bisa diset KRITIS
-        if verifikasi_deviasi > 5:
-            status_performa = "KRITIS"
-            status_class = "tolak" # Warna Merah
 
-        # Kirim variabel 'verifikasi_deviasi' ke template HTML
-        html_out = template.render(
-            departemen=selected_dept,
-            periode=periode_str,
-            total_memo=len(df_for_report),
-            total_nominal=total_nominal_str,
-            tgl_cetak=datetime.now().strftime("%d/%m/%Y %H:%M"),
-            verifikasi_deviasi=verifikasi_deviasi, # Variabel baru
-            status_performa=status_performa,
-            status_class=status_class,
-            rekomendasi_html=generate_rekomendasi_mpb(df_for_report),
-            data_rows=data_rows_list
-        )
-        # --- GANTI BAGIAN INI (DARI PDFKIT KE WEASYPRINT) ---
+        # Generate PDF ke memory
         pdf_out = HTML(string=html_out).write_pdf()
         
         return pdf_out, None
     except Exception as e:
         return None, str(e)
 
-# --- 6. FUNGSI AI MONTANA ---
+# --- 7. FUNGSI AI MONTANA ---
 def get_montana_chat_response(user_query):
     try:
         api_key = st.secrets.get("gemini_api_key")
@@ -188,26 +183,3 @@ def get_montana_chat_response(user_query):
                 pdf_file = BytesIO(resp.content)
                 reader = PdfReader(pdf_file)
                 extracted_text = "".join([page.extract_text() or "" for page in reader.pages[:5]])
-                if extracted_text.strip(): text_knowledge = extracted_text
-        except: pass
-        model = genai.GenerativeModel('gemini-pro')
-        prompt = f"Anda Montana, AI Petrokimia. Jawab ringkas dari data ini: {text_knowledge[:10000]}\n\nUser: {user_query}"
-        response = model.generate_content(prompt)
-        return response.text
-    except Exception as e:
-        return f"Kendala teknis: {str(e)}"
-    
-# --- TAMBAHKAN KONFIGURASI PATH ---
-        # Ini agar sistem bisa menemukan wkhtmltopdf baik di Lokal maupun di Cloud
-        path_wkhtmltopdf = '/usr/bin/wkhtmltopdf' # Path standar di Linux/Streamlit Cloud
-        config = pdfkit.configuration(wkhtmltopdf=path_wkhtmltopdf) if os.path.exists(path_wkhtmltopdf) else pdfkit.configuration()
-
-        options = {
-            'page-size': 'A4',
-            'encoding': "UTF-8",
-            'no-outline': None,
-            'quiet': ''
-        }
-        
-        # Eksekusi cetak dengan menyertakan konfigurasi
-        pdf_out = pdfkit.from_string(html_out, False, options=options, configuration=config)
