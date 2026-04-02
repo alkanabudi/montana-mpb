@@ -17,7 +17,7 @@ try:
     with st.expander("🛠 Debug Data Sistem"):
         st.write(f"Baris Penerimaan: {len(df_raw)} | Baris Proses: {len(df_proc)}")
 
-    # --- 2. KONVERSI TANGGAL ---
+    # --- 2. KONVERSI TANGGAL & EKSTRAK WAKTU ---
     col_tgl_hist = df_raw.columns[0]
     df_raw[col_tgl_hist] = pd.to_datetime(df_raw[col_tgl_hist], errors='coerce')
     
@@ -28,7 +28,7 @@ try:
 
     df_raw = df_raw.dropna(subset=[col_tgl_hist])
 
-    # Ekstrak Tahun & Bulan
+    # Ekstrak Tahun & Bulan untuk filter
     df_raw['Tahun'] = df_raw[col_tgl_hist].dt.year.astype(int)
     df_raw['Bulan'] = df_raw[col_tgl_hist].dt.month_name()
     
@@ -36,16 +36,16 @@ try:
         df_proc['Tahun'] = df_proc[col_tgl_proc].dt.year.astype(int)
         df_proc['Bulan'] = df_proc[col_tgl_proc].dt.month_name()
 
-    # --- 3. SIDEBAR FILTERS ---
-    st.sidebar.header("🔍 Filter Analisis")
+    # --- 3. SIDEBAR FILTERS (UNTUK GRAFIK) ---
+    st.sidebar.header("🔍 Filter Analisis Grafik")
     all_years = sorted(list(set(df_raw['Tahun'].unique()) | (set(df_proc['Tahun'].unique()) if not df_proc.empty else set())), reverse=True)
-    sel_year = st.sidebar.selectbox("Pilih Tahun", all_years if all_years else [2026])
+    sel_year = st.sidebar.selectbox("Pilih Tahun Grafik", all_years if all_years else [datetime.now().year])
     
     months_order = ["January", "February", "March", "April", "May", "June", 
                     "July", "August", "September", "October", "November", "December"]
-    sel_months = st.sidebar.multiselect("Pilih Bulan", months_order)
+    sel_months = st.sidebar.multiselect("Pilih Bulan Grafik", months_order)
 
-    # Filtering Data
+    # Filtering Data Grafik
     df_h_f = df_raw[df_raw['Tahun'] == int(sel_year)]
     df_p_f = df_proc[df_proc['Tahun'] == int(sel_year)] if not df_proc.empty else pd.DataFrame()
     
@@ -107,40 +107,49 @@ try:
 
     st.divider()
 
-    # --- 5. FITUR CETAK LAPORAN PDF PRO (ATM STYLE) ---
+    # --- 5. FITUR CETAK LAPORAN PDF (REVISI PERIODE DARI DROPLIST TAHUN) ---
     st.markdown("### 🖨️ Cetak Laporan PDF Profesional")
-    st.info("Download rekapitulasi PDF dengan analisis rekomendasi otomatis berbasis filter di atas.")
     
     with st.expander("⚙️ Pengaturan Cetak Laporan", expanded=True):
-        c1, c2 = st.columns(2)
-        with c1:
-            list_dept_f = sorted(df_h_f['ASAL DEPARTEMEN'].unique())
-            sel_dept_pdf = st.selectbox("Pilih Departemen untuk Laporan", list_dept_f)
-        with c2:
-            period_val = f"{', '.join(sel_months) if sel_months else 'Tahunan'} {sel_year}"
-            period_str = st.text_input("Periode Laporan", value=period_val)
+        col_pdf1, col_pdf2 = st.columns(2)
+        
+        with col_pdf1:
+            # Pilih Departemen (Sama seperti sebelumnya)
+            list_dept_f = sorted(df_raw['ASAL DEPARTEMEN'].unique())
+            sel_dept_pdf = st.selectbox("Pilih Departemen", list_dept_f, key="sb_dept_pdf")
+            
+        with col_pdf2:
+            # REVISI: Pilih Tahun dari Droplist (Mengambil tahun unik dari GSheet)
+            list_years_avail = sorted(df_raw['Tahun'].unique(), reverse=True)
+            sel_year_pdf = st.selectbox("Pilih Periode Tahun", list_years_avail, key="sb_year_pdf")
 
-        # Filter data untuk dikirim ke PDF generator
-        df_pdf_data = df_h_f[df_h_f['ASAL DEPARTEMEN'] == sel_dept_pdf].copy()
+        # Filter data PDF berdasarkan pilihan Departemen DAN Tahun yang baru dipilih
+        df_pdf_final = df_raw[
+            (df_raw['ASAL DEPARTEMEN'] == sel_dept_pdf) & 
+            (df_raw['Tahun'] == sel_year_pdf)
+        ].copy()
 
         if st.button("📥 Generate & Download PDF Report", use_container_width=True, type="primary"):
-            if not df_pdf_data.empty:
-                with st.spinner(f"Menganalisis data {sel_dept_pdf}..."):
-                    pdf_bytes, err = create_pdf_report_mpb(df_pdf_data, sel_dept_pdf, period_str)
+            if not df_pdf_final.empty:
+                with st.spinner(f"Menganalisis data {sel_dept_pdf} Tahun {sel_year_pdf}..."):
+                    # Buat string periode untuk isi laporan PDF
+                    period_str = f"Tahunan {sel_year_pdf}"
+                    
+                    pdf_bytes, err = create_pdf_report_mpb(df_pdf_final, sel_dept_pdf, period_str)
                     
                     if err:
                         st.error(f"Gagal Cetak: {err}")
                     else:
-                        st.success("✅ Laporan PDF siap diunduh!")
+                        st.success(f"✅ Laporan {sel_dept_pdf} ({sel_year_pdf}) siap!")
                         st.download_button(
                             label="💾 Download File PDF",
                             data=pdf_bytes,
-                            file_name=f"Montana_Report_{sel_dept_pdf.replace(' ', '_')}.pdf",
+                            file_name=f"Report_MPB_{sel_dept_pdf.replace(' ', '_')}_{sel_year_pdf}.pdf",
                             mime="application/pdf",
                             use_container_width=True
                         )
             else:
-                st.warning("Data untuk departemen terpilih kosong pada filter ini.")
+                st.warning(f"Data tidak ditemukan untuk {sel_dept_pdf} pada tahun {sel_year_pdf}.")
 
 except Exception as e:
     st.error(f"Kesalahan Sistem: {e}")
