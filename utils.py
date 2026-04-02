@@ -43,7 +43,7 @@ def get_clean_df(list_of_lists):
         data_rows.append(filtered_row)
     return pd.DataFrame(data_rows, columns=clean_headers)
 
-# --- 3. AMBIL DATA DARI GOOGLE SHEETS ---
+# --- 3. AMBIL DATA ---
 @st.cache_data(ttl=60)
 def get_data_from_google():
     client = get_gspread_client()
@@ -60,7 +60,6 @@ def get_data_from_google():
             df["NOMINAL TAGIHAN"] = to_numeric_clean(df["NOMINAL TAGIHAN"])
         return df
     except Exception as e:
-        st.error(f"Gagal ambil data: {e}")
         return pd.DataFrame()
 
 @st.cache_data(ttl=60)
@@ -77,7 +76,7 @@ def get_data_mpb_2025():
     except:
         return pd.DataFrame()
 
-# --- 4. SIMPAN DATA KE GOOGLE SHEETS ---
+# --- 4. SIMPAN DATA ---
 def save_data_to_google(data_dict):
     try:
         client = get_gspread_client()
@@ -92,23 +91,21 @@ def save_data_to_google(data_dict):
     except Exception as e:
         return False, f"Gagal simpan: {str(e)}"
 
-# --- 5. LOGIKA REKOMENDASI OTOMATIS ---
+# --- 5. LOGIKA REKOMENDASI ---
 def generate_rekomendasi_mpb(df_dept):
     rekomendasi = []
     if df_dept.empty: return "<li>Belum ada data untuk dianalisis.</li>"
     total_memo = len(df_dept)
     nom_hist = df_dept["NOMINAL TAGIHAN"].sum() if "NOMINAL TAGIHAN" in df_dept.columns else 0
-    
     if total_memo > 15:
-        rekomendasi.append(f"<b>Volume Tinggi:</b> Departemen mengirim {total_memo} memo. Mohon verifikasi kelengkapan dokumen di sisi unit sebelum kirim ke Akuntansi.")
+        rekomendasi.append(f"<b>Volume Tinggi:</b> Terdeteksi {total_memo} memo periode ini.")
     if nom_hist > 500000000:
-        rekomendasi.append(f"<b>Nominal Besar:</b> Total tagihan Rp {nom_hist:,.0f}. Pastikan PO dan Invoice telah divalidasi dengan teliti.")
-    
+        rekomendasi.append(f"<b>Nominal Besar:</b> Total tagihan mencapai Rp {nom_hist:,.0f}.")
     if not rekomendasi:
-        rekomendasi.append("<b>Normal:</b> Tren penerimaan stabil dan sesuai dengan kapasitas pemrosesan.")
+        rekomendasi.append("<b>Normal:</b> Tren penerimaan stabil.")
     return "".join([f"<li>{r}</li>" for r in rekomendasi])
 
-# --- 6. LOGIKA CETAK PDF (WEASYPRINT) ---
+# --- 6. CETAK PDF (WEASYPRINT) ---
 def create_pdf_report_mpb(df_for_report, selected_dept, periode_str):
     try:
         tgl_cetak = datetime.now().strftime("%d/%m/%Y %H:%M")
@@ -116,70 +113,47 @@ def create_pdf_report_mpb(df_for_report, selected_dept, periode_str):
         nom_total = df_for_report["NOMINAL TAGIHAN"].sum() if "NOMINAL TAGIHAN" in df_for_report.columns else 0
         total_nominal_str = f"Rp {nom_total:,.0f}".replace(",", ".")
         
-        # HITUNG DEVIASI (BERDASARKAN STATUS REVISI)
+        # Hitung Deviasi REVISI
         verifikasi_deviasi = 0
         if 'VERIFIKASI' in df_for_report.columns:
-            # Hitung jumlah baris yang statusnya 'REVISI' (case insensitive)
             verifikasi_deviasi = len(df_for_report[df_for_report['VERIFIKASI'].astype(str).str.upper() == 'REVISI'])
         
-        # Tentukan Status Performa
+        status_performa = "NORMAL"
+        status_class = "selesai"
         if verifikasi_deviasi > 0:
             status_performa = "WASPADA"
-            status_class = "proses" # CSS: Oranye
-        else:
-            status_performa = "NORMAL"
-            status_class = "selesai" # CSS: Hijau
-            
-        if verifikasi_deviasi > 5:
-            status_performa = "KRITIS"
-            status_class = "tolak" # CSS: Merah
+            status_class = "proses"
 
-        # Siapkan Riwayat Data
         data_rows = df_for_report.copy()
         if "NOMINAL TAGIHAN" in data_rows.columns:
             data_rows["NOMINAL TAGIHAN"] = data_rows["NOMINAL TAGIHAN"].apply(lambda x: f"{x:,.0f}".replace(",", "."))
         data_rows_list = data_rows.to_dict('records')
-
         rekomendasi_html = generate_rekomendasi_mpb(df_for_report)
 
-        # Setup Jinja2 (Target folder views)
         template_dir = os.path.join(os.getcwd(), 'views')
         env = Environment(loader=FileSystemLoader(template_dir))
         template = env.get_template('report_template.html')
 
-        # Render HTML
         html_out = template.render(
-            departemen=selected_dept, 
-            periode=periode_str, 
-            total_memo=total_memo,
-            total_nominal=total_nominal_str, 
-            tgl_cetak=tgl_cetak, 
-            data_rows=data_rows_list,
-            verifikasi_deviasi=verifikasi_deviasi,
-            status_performa=status_performa, 
-            status_class=status_class,
-            rekomendasi_html=rekomendasi_html
+            departemen=selected_dept, periode=periode_str, total_memo=total_memo,
+            total_nominal=total_nominal_str, tgl_cetak=tgl_cetak, data_rows=data_rows_list,
+            verifikasi_deviasi=verifikasi_deviasi, status_performa=status_performa, 
+            status_class=status_class, rekomendasi_html=rekomendasi_html
         )
 
-        # Generate PDF ke memory
         pdf_out = HTML(string=html_out).write_pdf()
-        
         return pdf_out, None
     except Exception as e:
         return None, str(e)
 
-# --- 7. FUNGSI AI MONTANA ---
+# --- 7. AI MONTANA ---
 def get_montana_chat_response(user_query):
     try:
         api_key = st.secrets.get("gemini_api_key")
-        if not api_key: return "Kunci API tidak ditemukan."
+        if not api_key: return "API Key missing."
         genai.configure(api_key=api_key)
-        text_knowledge = "Data SOP tidak tersedia sementara." 
-        file_id = "1jX-yVKyMmIuOOdx7Z-qpEtTYzn_RhNu1" 
-        url = f'https://drive.google.com/uc?id={file_id}&export=download'
-        try:
-            resp = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=10)
-            if resp.status_code == 200:
-                pdf_file = BytesIO(resp.content)
-                reader = PdfReader(pdf_file)
-                extracted_text = "".join([page.extract_text() or "" for page in reader.pages[:5]])
+        model = genai.GenerativeModel('gemini-pro')
+        response = model.generate_content(f"Anda Montana AI Petrokimia. Jawab ringkas: {user_query}")
+        return response.text
+    except Exception as e:
+        return f"Error: {str(e)}"
