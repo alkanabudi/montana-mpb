@@ -7,13 +7,18 @@ import requests
 import os
 import io
 import re
-from weasyprint import HTML
-import google.generativeai as genai
 from io import BytesIO
 from pypdf import PdfReader
 from datetime import datetime
 from jinja2 import Environment, FileSystemLoader
 from oauth2client.service_account import ServiceAccountCredentials
+import google.generativeai as genai
+
+# Proteksi WeasyPrint agar tidak memicu crash jika lib C Linux tidak terpasang
+try:
+    from weasyprint import HTML
+except (ImportError, OSError):
+    HTML = None
 
 # --- 1. KONEKSI GOOGLE SHEETS ---
 def get_gspread_client():
@@ -106,8 +111,11 @@ def generate_rekomendasi_mpb(df_dept):
         rekomendasi.append("<b>Normal:</b> Tren penerimaan stabil.")
     return "".join([f"<li>{r}</li>" for r in rekomendasi])
 
-# --- 6. CETAK PDF (WEASYPRINT) ---
+# --- 6. CETAK PDF (WEASYPRINT AMAN) ---
 def create_pdf_report_mpb(df_for_report, selected_dept, periode_str):
+    if HTML is None:
+        return None, "Fitur cetak PDF WeasyPrint sedang nonaktif di cloud (keterbatasan pustaka sistem)."
+
     try:
         tgl_cetak = datetime.now().strftime("%d/%m/%Y %H:%M")
         total_memo = len(df_for_report)
