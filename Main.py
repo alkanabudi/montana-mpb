@@ -167,3 +167,22 @@ else:
                         response = get_montana_chat_response(prompt)
                         st.markdown(response)
                 st.session_state.messages.append({"role": "assistant", "content": response})
+
+# Tambahkan halaman baru ke daftar routing
+pages = {
+    "Dashboard": [
+        st.Page("views/02_Dashboard.py", title="Dashboard", icon="📊"),
+    ],
+    "Fitur": [
+        st.Page("views/01_Input_Data.py", title="Input Data", icon="📝"),
+        st.Page("views/07_Scan_Memo.py", title="Scan & Verifikasi Memo", icon="🔍"),  # <-- Tambahkan ini
+        st.Page("views/05_Tagihan_Proses.py", title="Tagihan Proses", icon="⏳"),
+    ]
+}
+pg = st.navigation(pages)
+pg.run()
+
+menu = st.sidebar.radio("Navigasi", ["Dashboard", "Input Data", "Scan Memo", "Tagihan Proses"])
+
+if menu == "Scan Memo":
+    import views.07_Scan_Memo as scan_page  # atau exec(open("views/07_Scan_Memo.py").read())
