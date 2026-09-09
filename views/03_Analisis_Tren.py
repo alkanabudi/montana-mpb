@@ -3,7 +3,6 @@ import pandas as pd
 import plotly.express as px
 from datetime import datetime
 from utils import get_data_from_google, get_data_mpb_2025, create_pdf_report_mpb
-
 # 1. Konfigurasi Layout (Wide)
 st.markdown("<style>.block-container {max-width: 95% !important; padding-top: 2rem;}</style>", unsafe_allow_html=True)
 

@@ -4,7 +4,7 @@ import streamlit as st
 st.set_page_config(
     page_title="MONTANA System", 
     layout="centered", 
-    initial_sidebar_state="expanded" # Dipaksa terbuka agar user HP tidak bingung
+    initial_sidebar_state="expanded" 
 )
 
 # --- CSS GLOBAL: LOGIN & UI ---
@@ -93,12 +93,12 @@ if not st.session_state.logged_in:
             
             if submitted:
                 # Login Admin
-                if user == "admin" and pwd == "admin123":
+                if user == "admin" and pwd == "mpb123":
                     st.session_state.logged_in = True
                     st.session_state.role = "ADMIN"
                     st.rerun()
                 # Login Unit
-                elif user == "unit" and pwd == "unit123":
+                elif user == "unit" and pwd == "mpb456":
                     st.session_state.logged_in = True
                     st.session_state.role = "UNIT"
                     st.rerun()
@@ -107,7 +107,7 @@ if not st.session_state.logged_in:
                     
     st.markdown("""
         <p style='text-align: center; color: white; font-weight: bold; opacity: 0.9; text-shadow: 1px 1px 3px rgba(0,0,0,0.5);'>
-            developed by AlkaNa Budi @ 2026<br>
+            developed by AlkaNa @ 2026<br>
             PT Petrokimia Gresik
         </p>
     """, unsafe_allow_html=True)
