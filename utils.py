@@ -6,6 +6,7 @@ import json
 import requests
 import os
 import io
+import re
 from weasyprint import HTML
 import google.generativeai as genai
 from io import BytesIO
@@ -59,7 +60,7 @@ def get_data_from_google():
         if "NOMINAL TAGIHAN" in df.columns:
             df["NOMINAL TAGIHAN"] = to_numeric_clean(df["NOMINAL TAGIHAN"])
         return df
-    except Exception as e:
+    except Exception:
         return pd.DataFrame()
 
 @st.cache_data(ttl=60)
@@ -73,7 +74,7 @@ def get_data_mpb_2025():
             if col in df.columns:
                 df[col] = to_numeric_clean(df[col])
         return df
-    except:
+    except Exception:
         return pd.DataFrame()
 
 # --- 4. SIMPAN DATA ---
@@ -113,7 +114,6 @@ def create_pdf_report_mpb(df_for_report, selected_dept, periode_str):
         nom_total = df_for_report["NOMINAL TAGIHAN"].sum() if "NOMINAL TAGIHAN" in df_for_report.columns else 0
         total_nominal_str = f"Rp {nom_total:,.0f}".replace(",", ".")
         
-        # Hitung Deviasi REVISI
         verifikasi_deviasi = 0
         if 'VERIFIKASI' in df_for_report.columns:
             verifikasi_deviasi = len(df_for_report[df_for_report['VERIFIKASI'].astype(str).str.upper() == 'REVISI'])
@@ -157,3 +157,60 @@ def get_montana_chat_response(user_query):
         return response.text
     except Exception as e:
         return f"Error: {str(e)}"
+
+# --- 8. EKSTRAKSI & VERIFIKASI MEMO PDF ---
+def extract_and_verify_memo_pdf(pdf_file):
+    extracted_data = {
+        "no_memo": None,
+        "tanggal_memo": None,
+        "nominal": 0,
+        "pic": None,
+        "departemen": None,
+        "raw_text": ""
+    }
+    
+    verification_checks = {
+        "format_memo": False,
+        "nominal_valid": False,
+        "ttd_terdeteksi": False,
+        "ext_pic_terdeteksi": False
+    }
+
+    try:
+        reader = PdfReader(pdf_file)
+        full_text = ""
+        for page in reader.pages:
+            text = page.extract_text()
+            if text:
+                full_text += text + "\n"
+        
+        extracted_data["raw_text"] = full_text
+
+        # 1. Ekstrak Nomor Memo
+        memo_pattern = r'(\d+/[A-Z0-9\.-]+/\d{4}|\d+/[A-Z0-9\.-]+/[A-Z0-9\.-]+/\d{4})'
+        memo_match = re.search(memo_pattern, full_text)
+        if memo_match:
+            extracted_data["no_memo"] = memo_match.group(1)
+            verification_checks["format_memo"] = True
+
+        # 2. Ekstrak Nominal Tagihan
+        nominal_pattern = r'(?:Rp\.?|IDR)\s*([\d\.,]+)'
+        nominal_match = re.search(nominal_pattern, full_text, re.IGNORECASE)
+        if nominal_match:
+            raw_nom = nominal_match.group(1).replace('.', '').replace(',', '')
+            if raw_nom.isdigit():
+                extracted_data["nominal"] = float(raw_nom)
+                if extracted_data["nominal"] > 0:
+                    verification_checks["nominal_valid"] = True
+
+        # 3. Pengecekan SOP (Otorisasi & PIC)
+        if re.search(r'(Tanda Tangan|Signed|Approve|Disetujui|Menyetujui)', full_text, re.IGNORECASE):
+            verification_checks["ttd_terdeteksi"] = True
+            
+        if re.search(r'(EXT|Ext\.|Extension|Hp|Telp)', full_text, re.IGNORECASE):
+            verification_checks["ext_pic_terdeteksi"] = True
+
+        return extracted_data, verification_checks, None
+
+    except Exception as e:
+        return None, None, str(e)
