@@ -8,4 +8,3 @@ requests
 plotly
 jinja2
 xlsxwriter
-weasyprint==60.2
