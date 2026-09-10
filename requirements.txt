@@ -1,9 +1,10 @@
 streamlit
 pandas
 gspread
-oauth2client
+google-auth
 google-generativeai
 pypdf
+fpdf2
 requests
 plotly
 jinja2
