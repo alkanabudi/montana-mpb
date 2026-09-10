@@ -12,6 +12,7 @@ from datetime import datetime
 from jinja2 import Environment, FileSystemLoader
 from google.oauth2.service_account import Credentials
 import google.generativeai as genai
+from fpdf import FPDF
 
 # Proteksi WeasyPrint agar tidak memicu crash jika lib C Linux tidak terpasang
 try:
@@ -143,48 +144,90 @@ def generate_rekomendasi_mpb(df_dept):
         rekomendasi.append("<b>Normal:</b> Tren penerimaan stabil.")
     return "".join([f"<li>{r}</li>" for r in rekomendasi])
 
-# --- 6. CETAK PDF (WEASYPRINT AMAN) ---
-def create_pdf_report_mpb(df_for_report, selected_dept, periode_str):
-    if HTML is None:
-        return None, "Fitur cetak PDF WeasyPrint sedang nonaktif di cloud (keterbatasan pustaka sistem)."
+# --- 6. CETAK PDF MENGGUNAKAN FPDF2 (AMAN UNTUK CLOUD) ---
+class MPBReportPDF(FPDF):
+    def header(self):
+        self.set_font("Helvetica", "B", 13)
+        self.cell(0, 8, "LAPORAN MONITORING MEMO PERINTAH BAYAR (MPB)", ln=True, align="C")
+        self.set_font("Helvetica", size=9)
+        self.cell(0, 5, "PT Petrokimia Gresik - Sistem MONTANA", ln=True, align="C")
+        self.ln(4)
+        self.line(10, self.get_y(), 200, self.get_y())
+        self.ln(4)
 
+    def footer(self):
+        self.set_y(-15)
+        self.set_font("Helvetica", "I", 8)
+        self.cell(0, 10, f"Halaman {self.page_no()}/{{nb}}", align="C")
+
+def create_pdf_report_mpb(df_for_report, selected_dept, periode_str):
     try:
         tgl_cetak = datetime.now().strftime("%d/%m/%Y %H:%M")
         total_memo = len(df_for_report)
         nom_total = df_for_report["NOMINAL TAGIHAN"].sum() if "NOMINAL TAGIHAN" in df_for_report.columns else 0
-        total_nominal_str = f"Rp {nom_total:,.0f}".replace(",", ".")
         
-        verifikasi_deviasi = 0
-        if 'VERIFIKASI' in df_for_report.columns:
-            verifikasi_deviasi = len(df_for_report[df_for_report['VERIFIKASI'].astype(str).str.upper() == 'REVISI'])
+        pdf = MPBReportPDF(orientation="P", unit="mm", format="A4")
+        pdf.alias_nb_pages()
+        pdf.add_page()
         
-        status_performa = "NORMAL"
-        status_class = "selesai"
-        if verifikasi_deviasi > 0:
-            status_performa = "WASPADA"
-            status_class = "proses"
+        # Metadata Header
+        pdf.set_font("Helvetica", "B", 10)
+        pdf.cell(35, 6, "Departemen:", 0, 0)
+        pdf.set_font("Helvetica", "", 10)
+        pdf.cell(0, 6, str(selected_dept), 0, 1)
 
-        data_rows = df_for_report.copy()
-        if "NOMINAL TAGIHAN" in data_rows.columns:
-            data_rows["NOMINAL TAGIHAN"] = data_rows["NOMINAL TAGIHAN"].apply(lambda x: f"{x:,.0f}".replace(",", "."))
-        data_rows_list = data_rows.to_dict('records')
-        rekomendasi_html = generate_rekomendasi_mpb(df_for_report)
+        pdf.set_font("Helvetica", "B", 10)
+        pdf.cell(35, 6, "Periode:", 0, 0)
+        pdf.set_font("Helvetica", "", 10)
+        pdf.cell(0, 6, str(periode_str), 0, 1)
 
-        template_dir = os.path.join(os.getcwd(), 'views')
-        env = Environment(loader=FileSystemLoader(template_dir))
-        template = env.get_template('report_template.html')
+        pdf.set_font("Helvetica", "B", 10)
+        pdf.cell(35, 6, "Total Memo:", 0, 0)
+        pdf.set_font("Helvetica", "", 10)
+        pdf.cell(50, 6, f"{total_memo} Dokumen", 0, 0)
 
-        html_out = template.render(
-            departemen=selected_dept, periode=periode_str, total_memo=total_memo,
-            total_nominal=total_nominal_str, tgl_cetak=tgl_cetak, data_rows=data_rows_list,
-            verifikasi_deviasi=verifikasi_deviasi, status_performa=status_performa, 
-            status_class=status_class, rekomendasi_html=rekomendasi_html
-        )
+        pdf.set_font("Helvetica", "B", 10)
+        pdf.cell(30, 6, "Total Nilai:", 0, 0)
+        pdf.set_font("Helvetica", "", 10)
+        pdf.cell(0, 6, f"Rp {nom_total:,.0f}".replace(",", "."), 0, 1)
 
-        pdf_out = HTML(string=html_out).write_pdf()
-        return pdf_out, None
+        pdf.set_font("Helvetica", "I", 8)
+        pdf.cell(0, 6, f"Dicetak pada: {tgl_cetak}", 0, 1)
+        pdf.ln(3)
+
+        # Tabel Header
+        pdf.set_fill_color(230, 230, 230)
+        pdf.set_font("Helvetica", "B", 8)
+        pdf.cell(10, 7, "No", 1, 0, "C", fill=True)
+        pdf.cell(55, 7, "No Memo", 1, 0, "C", fill=True)
+        pdf.cell(45, 7, "Nominal Tagihan", 1, 0, "C", fill=True)
+        pdf.cell(40, 7, "Tanggal / Waktu", 1, 0, "C", fill=True)
+        pdf.cell(40, 7, "Status / PIC", 1, 1, "C", fill=True)
+
+        # Isi Tabel Data
+        pdf.set_font("Helvetica", "", 8)
+        for idx, row in enumerate(df_for_report.to_dict('records'), start=1):
+            no_memo = str(row.get("NO MEMO", row.get("NOMOR MEMO", "-")))[:28]
+            nominal_val = row.get("NOMINAL TAGIHAN", 0)
+            nom_str = f"Rp {nominal_val:,.0f}".replace(",", ".")
+            waktu_str = str(row.get("Waktu", row.get("TANGGAL", "-")))[:18]
+            status_str = str(row.get("STATUS", row.get("PIC", "-")))[:18]
+
+            pdf.cell(10, 6, str(idx), 1, 0, "C")
+            pdf.cell(55, 6, no_memo, 1, 0, "L")
+            pdf.cell(45, 6, nom_str, 1, 0, "R")
+            pdf.cell(40, 6, waktu_str, 1, 0, "C")
+            pdf.cell(40, 6, status_str, 1, 1, "C")
+
+            # Batas baris agar tabel tidak overflow halaman tanpa kontrol
+            if pdf.get_y() > 270:
+                pdf.add_page()
+
+        pdf_bytes = bytes(pdf.output())
+        return pdf_bytes, None
+
     except Exception as e:
-        return None, str(e)
+        return None, f"Gagal membuat PDF: {str(e)}"
 
 # --- 7. AI MONTANA ---
 def get_montana_chat_response(user_query):
