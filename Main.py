@@ -1,4 +1,5 @@
 import streamlit as st
+from utils import get_montana_chat_response
 
 # 1. Konfigurasi Halaman Dasar
 st.set_page_config(
@@ -10,7 +11,6 @@ st.set_page_config(
 # --- CSS GLOBAL: LOGIN & UI ---
 image_url = "https://storage.googleapis.com/pkg-portal-bucket/images/PG_website1_Kantor-Pusat-Petrokimia-Gresik.jpeg"
 
-# Perhatikan penggunaan {{ dan }} di bawah ini
 final_style = f"""
     <style>
     .stAppHeader {{ visibility: hidden; }}
@@ -80,7 +80,7 @@ if not st.session_state.logged_in:
     st.markdown(final_style, unsafe_allow_html=True)
     st.markdown("<br><br>", unsafe_allow_html=True)
     
-    # Judul & Sub-judul dengan CSS Baru
+    # Judul & Sub-judul
     st.markdown('<p class="main-title">MONTANA MPB</p>', unsafe_allow_html=True)
     st.markdown('<p class="sub-title">Monitoring Analitik Tagihan Internal MPB</p>', unsafe_allow_html=True)
     
@@ -114,21 +114,25 @@ if not st.session_state.logged_in:
 
 # --- 2. HALAMAN SETELAH LOGIN ---
 else:
-    # Sidebar Security & Navigation
+    # Definisi Seluruh Objek Halaman
     pg_dash  = st.Page("views/02_Dashboard.py", title="Dashboard", icon="🏠")
     pg_tren  = st.Page("views/03_Analisis_Tren.py", title="Analisis Tren", icon="📈")
     pg_input = st.Page("views/01_Input_Data.py", title="Input Data", icon="➕")
     pg_hist  = st.Page("views/04_History.py", title="History Penerimaan", icon="📜")
     pg_proc  = st.Page("views/05_Tagihan_Proses.py", title="Tagihan Proses", icon="📑")
+    pg_scan  = st.Page("views/07_Scan_Memo.py", title="Scan & Verifikasi Memo", icon="🔍")
 
+    # Routing Berdasarkan Role
     if st.session_state.role == "ADMIN":
         menu = {
             "Monitoring": [pg_dash, pg_tren, pg_hist, pg_proc],
-            "Transaksi": [pg_input]
+            "Transaksi & Fitur": [pg_input, pg_scan]
         }
     else:
-        # Menu untuk Unit (Hanya Input & Lihat Proses)
-        menu = {"Layanan Unit": [pg_input, pg_proc]}
+        # Menu Unit
+        menu = {
+            "Layanan Unit": [pg_input, pg_scan, pg_proc]
+        }
 
     pg = st.navigation(menu, position="sidebar")
 
@@ -142,16 +146,15 @@ else:
             st.rerun()
         st.divider()
 
-    # JALANKAN HALAMAN UTAMA (VIEWS)
+    # Jalankan Halaman yang Dipilih
     pg.run()
 
-    # --- 3. WIDGET CHATBOT MONTANA AI (FLOATING) ---
+    # --- 3. WIDGET CHATBOT MONTANA AI (SIDEBAR) ---
     with st.sidebar:
         st.markdown("---")
         with st.expander("💬 Tanya Montana (AI)", expanded=False):
             st.caption("Asisten SOP MPB")
             
-            # Chat Interface
             for message in st.session_state.messages:
                 with st.chat_message(message["role"]):
                     st.markdown(message["content"])
@@ -161,28 +164,8 @@ else:
                     st.markdown(prompt)
                 st.session_state.messages.append({"role": "user", "content": prompt})
 
-                from utils import get_montana_chat_response
                 with st.chat_message("assistant"):
                     with st.spinner("Membaca data..."):
                         response = get_montana_chat_response(prompt)
                         st.markdown(response)
                 st.session_state.messages.append({"role": "assistant", "content": response})
-
-# Tambahkan halaman baru ke daftar routing
-pages = {
-    "Dashboard": [
-        st.Page("views/02_Dashboard.py", title="Dashboard", icon="📊"),
-    ],
-    "Fitur": [
-        st.Page("views/01_Input_Data.py", title="Input Data", icon="📝"),
-        st.Page("views/07_Scan_Memo.py", title="Scan & Verifikasi Memo", icon="🔍"),  # <-- Tambahkan ini
-        st.Page("views/05_Tagihan_Proses.py", title="Tagihan Proses", icon="⏳"),
-    ]
-}
-pg = st.navigation(pages)
-pg.run()
-
-menu = st.sidebar.radio("Navigasi", ["Dashboard", "Input Data", "Scan Memo", "Tagihan Proses"])
-
-if menu == "Scan Memo":
-    import views.07_Scan_Memo as scan_page  # atau exec(open("views/07_Scan_Memo.py").read())
