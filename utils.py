@@ -3,7 +3,6 @@ import pandas as pd
 import gspread
 import base64
 import json
-import requests
 import os
 import io
 import re
@@ -11,7 +10,7 @@ from io import BytesIO
 from pypdf import PdfReader
 from datetime import datetime
 from jinja2 import Environment, FileSystemLoader
-from oauth2client.service_account import ServiceAccountCredentials
+from google.oauth2.service_account import Credentials
 import google.generativeai as genai
 
 # Proteksi WeasyPrint agar tidak memicu crash jika lib C Linux tidak terpasang
@@ -20,29 +19,41 @@ try:
 except (ImportError, OSError):
     HTML = None
 
-# --- 1. KONEKSI GOOGLE SHEETS (FLEKSIBEL CLOUD & LOKAL) ---
+# --- 1. KONEKSI GOOGLE SHEETS (MENGGUNAKAN GOOGLE-AUTH TERSTANDAR) ---
 def get_gspread_client():
-    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+    scopes = [
+        "https://www.googleapis.com/auth/spreadsheets",
+        "https://www.googleapis.com/auth/drive"
+    ]
     try:
-        # 1. Coba baca dari Streamlit Secrets (Cloud)
+        # 1. Prioritas Cloud (Streamlit Secrets)
         if "gcp_service_account" in st.secrets:
-            # Jika memakai format TOML terurai
             creds_info = dict(st.secrets["gcp_service_account"])
-            # Tangani jika di TOML tersimpan encoded_key
+            
+            # Dukungan jika format base64
             if "encoded_key" in creds_info:
                 decoded_bytes = base64.b64decode(creds_info["encoded_key"].strip())
                 creds_info = json.loads(decoded_bytes.decode("utf-8"))
-            creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_info, scope)
-            return gspread.authorize(creds)
-        
-        # 2. Cadangan jika dijalankan lokal di VS Code (baca file JSON)
-        elif os.path.exists("newcredentials.json"):
-            creds = ServiceAccountCredentials.from_json_keyfile_name("newcredentials.json", scope)
-            return gspread.authorize(creds)
             
+            # Bersihkan dan perbaiki newline string private_key jika rusak oleh parser TOML
+            if "private_key" in creds_info:
+                key = str(creds_info["private_key"]).strip()
+                if "\\n" in key:
+                    key = key.replace("\\n", "\n")
+                creds_info["private_key"] = key
+
+            credentials = Credentials.from_service_account_info(creds_info, scopes=scopes)
+            return gspread.authorize(credentials)
+        
+        # 2. Prioritas Lokal (file newcredentials.json di VS Code)
+        elif os.path.exists("newcredentials.json"):
+            credentials = Credentials.from_service_account_file("newcredentials.json", scopes=scopes)
+            return gspread.authorize(credentials)
+            
+        print("Peringatan: Secrets [gcp_service_account] maupun file newcredentials.json tidak ditemukan.")
         return None
     except Exception as e:
-        print(f"Error gspread client: {e}")
+        print(f"Error autentikasi gspread client: {e}")
         return None
 
 # --- 2. PEMBERSIH DATA ---
@@ -66,40 +77,47 @@ def get_clean_df(list_of_lists):
 @st.cache_data(ttl=60)
 def get_data_from_google():
     client = get_gspread_client()
-    if client is None: return pd.DataFrame()
+    if client is None:
+        return pd.DataFrame()
     try:
         sheet = client.open("Daftar Penerimaan TAGIHAN MEMO PERINTAH BAYAR (Jawaban)").get_worksheet(0)
         df = get_clean_df(sheet.get_all_values())
-        if "Waktu" in df.columns:
-            df["Waktu"] = df["Waktu"].astype(str).str.strip()
-            df['waktu_sort'] = pd.to_datetime(df["Waktu"], errors='coerce')
-            df = df.sort_values(by="waktu_sort", ascending=False).drop(columns=['waktu_sort'])
-            df["Waktu"] = df["Waktu"].replace(['None', 'nan', 'NaT'], '')
-        if "NOMINAL TAGIHAN" in df.columns:
-            df["NOMINAL TAGIHAN"] = to_numeric_clean(df["NOMINAL TAGIHAN"])
+        if not df.empty:
+            if "Waktu" in df.columns:
+                df["Waktu"] = df["Waktu"].astype(str).str.strip()
+                df['waktu_sort'] = pd.to_datetime(df["Waktu"], errors='coerce')
+                df = df.sort_values(by="waktu_sort", ascending=False).drop(columns=['waktu_sort'])
+                df["Waktu"] = df["Waktu"].replace(['None', 'nan', 'NaT'], '')
+            if "NOMINAL TAGIHAN" in df.columns:
+                df["NOMINAL TAGIHAN"] = to_numeric_clean(df["NOMINAL TAGIHAN"])
         return df
-    except Exception:
+    except Exception as e:
+        print(f"Error get_data_from_google: {e}")
         return pd.DataFrame()
 
 @st.cache_data(ttl=60)
 def get_data_mpb_2025():
     client = get_gspread_client()
-    if client is None: return pd.DataFrame()
+    if client is None:
+        return pd.DataFrame()
     try:
         sheet = client.open("Memo Perintah Bayar 2025").get_worksheet(0)
         df = get_clean_df(sheet.get_all_values())
-        for col in ["Nilai Tagihan", "NOMINAL TAGIHAN"]:
-            if col in df.columns:
-                df[col] = to_numeric_clean(df[col])
+        if not df.empty:
+            for col in ["Nilai Tagihan", "NOMINAL TAGIHAN"]:
+                if col in df.columns:
+                    df[col] = to_numeric_clean(df[col])
         return df
-    except Exception:
+    except Exception as e:
+        print(f"Error get_data_mpb_2025: {e}")
         return pd.DataFrame()
 
 # --- 4. SIMPAN DATA ---
 def save_data_to_google(data_dict):
     try:
         client = get_gspread_client()
-        if client is None: return False, "Gagal koneksi."
+        if client is None:
+            return False, "Gagal koneksi ke Google Sheets."
         spreadsheet = client.open("Daftar Penerimaan TAGIHAN MEMO PERINTAH BAYAR (Jawaban)")
         sheet = spreadsheet.get_worksheet(0)
         existing_data = sheet.get_all_values()
@@ -113,7 +131,8 @@ def save_data_to_google(data_dict):
 # --- 5. LOGIKA REKOMENDASI ---
 def generate_rekomendasi_mpb(df_dept):
     rekomendasi = []
-    if df_dept.empty: return "<li>Belum ada data untuk dianalisis.</li>"
+    if df_dept.empty:
+        return "<li>Belum ada data untuk dianalisis.</li>"
     total_memo = len(df_dept)
     nom_hist = df_dept["NOMINAL TAGIHAN"].sum() if "NOMINAL TAGIHAN" in df_dept.columns else 0
     if total_memo > 15:
@@ -171,9 +190,10 @@ def create_pdf_report_mpb(df_for_report, selected_dept, periode_str):
 def get_montana_chat_response(user_query):
     try:
         api_key = st.secrets.get("gemini_api_key")
-        if not api_key: return "API Key missing."
+        if not api_key:
+            return "API Key missing."
         genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('gemini-pro')
+        model = genai.GenerativeModel('gemini-1.5-flash')
         response = model.generate_content(f"Anda Montana AI Petrokimia. Jawab ringkas: {user_query}")
         return response.text
     except Exception as e:
