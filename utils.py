@@ -20,16 +20,29 @@ try:
 except (ImportError, OSError):
     HTML = None
 
-# --- 1. KONEKSI GOOGLE SHEETS ---
+# --- 1. KONEKSI GOOGLE SHEETS (FLEKSIBEL CLOUD & LOKAL) ---
 def get_gspread_client():
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
     try:
-        encoded_key = st.secrets["gcp_service_account"]["encoded_key"].strip()
-        decoded_bytes = base64.b64decode(encoded_key)
-        creds_info = json.loads(decoded_bytes.decode("utf-8"))
-        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_info, scope)
-        return gspread.authorize(creds)
-    except Exception:
+        # 1. Coba baca dari Streamlit Secrets (Cloud)
+        if "gcp_service_account" in st.secrets:
+            # Jika memakai format TOML terurai
+            creds_info = dict(st.secrets["gcp_service_account"])
+            # Tangani jika di TOML tersimpan encoded_key
+            if "encoded_key" in creds_info:
+                decoded_bytes = base64.b64decode(creds_info["encoded_key"].strip())
+                creds_info = json.loads(decoded_bytes.decode("utf-8"))
+            creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_info, scope)
+            return gspread.authorize(creds)
+        
+        # 2. Cadangan jika dijalankan lokal di VS Code (baca file JSON)
+        elif os.path.exists("newcredentials.json"):
+            creds = ServiceAccountCredentials.from_json_keyfile_name("newcredentials.json", scope)
+            return gspread.authorize(creds)
+            
+        return None
+    except Exception as e:
+        print(f"Error gspread client: {e}")
         return None
 
 # --- 2. PEMBERSIH DATA ---
